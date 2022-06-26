@@ -1,5 +1,12 @@
 package main
 
+import (
+	"github.com/tryfix/log"
+	"os"
+)
+
 func main() {
-	initHttpClient(initAgent())
+	logger := log.NewLog().Log()
+	args := os.Args
+	initHttpClient(args[1], initAgent(logger), logger)
 }
