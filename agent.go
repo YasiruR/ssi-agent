@@ -1,9 +1,15 @@
 package main
 
 import (
+	"encoding/base64"
+	"encoding/json"
+	"github.com/google/uuid"
+	"github.com/hyperledger/aries-framework-go/pkg/client/didexchange"
 	"github.com/hyperledger/aries-framework-go/pkg/client/issuecredential"
+	"github.com/hyperledger/aries-framework-go/pkg/client/mediator"
 	"github.com/hyperledger/aries-framework-go/pkg/client/outofbandv2"
 	"github.com/hyperledger/aries-framework-go/pkg/didcomm/common/service"
+	"github.com/hyperledger/aries-framework-go/pkg/didcomm/protocol/decorator"
 	issuecredential2 "github.com/hyperledger/aries-framework-go/pkg/didcomm/protocol/issuecredential"
 	outofbandv22 "github.com/hyperledger/aries-framework-go/pkg/didcomm/protocol/outofbandv2"
 	"github.com/hyperledger/aries-framework-go/pkg/framework/aries"
@@ -15,6 +21,9 @@ import (
 type agent struct {
 	oob struct {
 		client *outofbandv2.Client
+	}
+	did struct {
+		client *didexchange.Client
 	}
 	vc struct {
 		issuer *issuecredential.Client
@@ -42,23 +51,23 @@ func initAgent(logger log.Logger) *agent {
 
 	//go a.handleVCIssuance()
 
-	// todo test
 	oob, err := outofbandv2.New(ctx)
 	if err != nil {
 		logger.Fatal(err)
 	}
 	a.oob.client = oob
 
-	//oobDids, err := didexchange.New(ctx)
-	//if err != nil {
-	//	logger.Fatal(err)
-	//}
-	//oobEvents := make(chan service.DIDCommAction, 5)
-	//
-	//err = oobDids.RegisterActionEvent(oobEvents)
-	//if err != nil {
-	//	logger.Fatal(err)
-	//}
+	oobDids, err := didexchange.New(ctx)
+	if err != nil {
+		logger.Fatal(err)
+	}
+	a.did.client = oobDids
+
+	oobEvents := make(chan service.DIDCommAction, 5)
+	err = oobDids.RegisterActionEvent(oobEvents)
+	if err != nil {
+		logger.Fatal(err)
+	}
 
 	return &a
 }
@@ -79,7 +88,20 @@ func initIssuer(ctx *context.Provider, logger log.Logger) (*issuecredential.Clie
 }
 
 func (a *agent) createInvitation() (*outofbandv22.Invitation, error) {
-	inv, err := a.oob.client.CreateInvitation()
+	routeReq, err := json.Marshal(mediator.NewRequest())
+	if err != nil {
+		return nil, err
+	}
+
+	inv, err := a.oob.client.CreateInvitation(
+		outofbandv2.WithLabel("agent"),
+		outofbandv2.WithAttachments(&decorator.AttachmentV2{
+			ID: uuid.New().String(),
+			Data: decorator.AttachmentData{
+				Base64: base64.StdEncoding.EncodeToString(routeReq),
+			},
+		}),
+	)
 	if err != nil {
 		return nil, err
 	}
