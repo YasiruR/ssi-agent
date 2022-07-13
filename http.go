@@ -27,6 +27,8 @@ func initHttpClient(port string, agent *agent, logger log.Logger) {
 	t.router.HandleFunc(`/connection/create-invitation`, t.handleCreateInvitation).Methods(http.MethodPut)
 	t.router.HandleFunc(`/connection/handle-invitation`, t.handleHandleInvitation).Methods(http.MethodPost)
 
+	// service endpoint
+
 	if err := http.ListenAndServe(":"+port, t.router); err != nil {
 		t.logger.Fatal(err)
 	}
@@ -53,7 +55,14 @@ func (t *transport) handleCreateInvitation(w http.ResponseWriter, r *http.Reques
 		t.logger.Fatal(err)
 	}
 
-	fmt.Println("agent sending invitation ", inv.Invitation)
+	//fmt.Println("agent sending invitation ", inv.Invitation)
+	fmt.Println("type: ", inv.Type)
+	fmt.Println("id: ", inv.ID)
+	fmt.Println("label: ", inv.Label)
+	fmt.Println("rec keys: ", inv.RecipientKeys)
+	fmt.Println("endpoint: ", inv.ServiceEndpoint)
+	fmt.Println("routing keys: ", inv.RoutingKeys)
+	fmt.Println("did: ", inv.DID)
 
 	err = json.NewEncoder(w).Encode(inv)
 	if err != nil {
@@ -68,18 +77,19 @@ func (t *transport) handleHandleInvitation(w http.ResponseWriter, r *http.Reques
 	}
 	defer r.Body.Close()
 
-	inv := &didexchange.Invitation{}
-	err = json.Unmarshal(data, inv)
+	inv := didexchange.Invitation{}
+	err = json.Unmarshal(data, &inv)
 	if err != nil {
 		t.logger.Fatal("unmarshall error: ", err)
 	}
 
-	id, err := t.agent.handleInvitation(inv)
+	id, err := t.agent.handleInvitation(&inv)
 	if err != nil {
 		t.logger.Fatal("agent error: ", err)
 	}
 
-	fmt.Println("user connecting to ", id)
+	fmt.Println("received inv: ", inv.Invitation)
+	fmt.Println("conn id (receiver): ", id)
 
 	w.WriteHeader(http.StatusOK)
 	_, err = w.Write([]byte(id))

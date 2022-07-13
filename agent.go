@@ -3,18 +3,21 @@ package main
 import (
 	"errors"
 	"fmt"
+	"github.com/hyperledger/aries-framework-go-ext/component/vdr/indy"
 	"github.com/hyperledger/aries-framework-go/pkg/client/didexchange"
 	"github.com/hyperledger/aries-framework-go/pkg/didcomm/common/service"
 	"github.com/hyperledger/aries-framework-go/pkg/framework/aries"
 	"github.com/tryfix/log"
+	"os"
 )
 
 type agent struct {
 	client *didexchange.Client
+	vdr    *indy.VDR
 	logger log.Logger
 }
 
-func initAgent(logger log.Logger) *agent {
+func initAgent(port string, logger log.Logger) *agent {
 	framework, err := aries.New()
 	if err != nil {
 		logger.Fatal(err)
@@ -36,9 +39,21 @@ func initAgent(logger log.Logger) *agent {
 		logger.Fatal(err)
 	}
 
-	//go service.AutoExecuteActionEvent(clientActions)
+	// initiate indy vdr
+	pwd, err := os.Getwd()
+	if err != nil {
+		logger.Fatal(err)
+	}
 
-	return &agent{client: client, logger: logger}
+	vdr, err := indy.New(`sov`, indy.WithIndyVDRGenesisFile(pwd+`/src/genesis.json`))
+	if err != nil {
+		logger.Fatal(err)
+	}
+
+	logger.Info("agent initialized")
+
+	//go service.AutoExecuteActionEvent(clientActions)
+	return &agent{client: client, vdr: vdr, logger: logger}
 }
 
 func (a *agent) createInvitation() (didexchange.Invitation, error) {
@@ -46,17 +61,6 @@ func (a *agent) createInvitation() (didexchange.Invitation, error) {
 	if err != nil {
 		return didexchange.Invitation{}, err
 	}
-
-	connID, err := a.handleInvitation(inv)
-	if err != nil {
-		return didexchange.Invitation{}, err
-	}
-
-	conn, err := a.connection(connID)
-	if err != nil {
-		return didexchange.Invitation{}, err
-	}
-	fmt.Println("(sender) connection details: ", conn.State, conn.ConnectionID, conn.InvitationID)
 
 	return *inv, nil
 }
@@ -66,6 +70,10 @@ func (a *agent) handleInvitation(inv *didexchange.Invitation) (connID string, er
 	if err != nil {
 		return
 	}
+
+	// create did doc
+	// create did for connection
+	// create connection request
 
 	return
 }
