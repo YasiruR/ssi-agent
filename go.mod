@@ -5,6 +5,7 @@ go 1.18
 require (
 	github.com/gorilla/mux v1.7.3
 	github.com/hyperledger/aries-framework-go v0.1.8
+	github.com/hyperledger/aries-framework-go/component/storageutil v0.0.0-20220322085443-50e8f9bd208b
 	github.com/tryfix/log v1.2.1
 )
 
@@ -22,11 +23,11 @@ require (
 	github.com/golang/snappy v0.0.1 // indirect
 	github.com/google/tink/go v1.6.1-0.20210519071714-58be99b3c4d0 // indirect
 	github.com/google/uuid v1.1.2 // indirect
-	github.com/hyperledger/aries-framework-go/component/storageutil v0.0.0-20220322085443-50e8f9bd208b // indirect
 	github.com/hyperledger/aries-framework-go/spi v0.0.0-20220322085443-50e8f9bd208b // indirect
 	github.com/jinzhu/copier v0.0.0-20190924061706-b57f9002281a // indirect
 	github.com/kawamuray/jsonpath v0.0.0-20201211160320-7483bafabd7e // indirect
 	github.com/kilic/bls12-381 v0.1.1-0.20210503002446-7b7597926c69 // indirect
+	github.com/klauspost/compress v1.10.0 // indirect
 	github.com/logrusorgru/aurora v0.0.0-20200102142835-e9ef32dff381 // indirect
 	github.com/minio/blake2b-simd v0.0.0-20160723061019-3f5f724cb5b1 // indirect
 	github.com/minio/sha256-simd v0.1.1 // indirect
@@ -57,4 +58,5 @@ require (
 	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c // indirect
 	google.golang.org/protobuf v1.27.1 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
+	nhooyr.io/websocket v1.8.3 // indirect
 )
