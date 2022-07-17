@@ -188,6 +188,8 @@ github.com/hyperledger/aries-framework-go v0.1.8 h1:nKPGTqh+gYWrczJ7mf6clbnDegKP
 github.com/hyperledger/aries-framework-go v0.1.8/go.mod h1:7ilurt17sjWruVIBxZSrwn8qUbROq8LXYYY+O7dNxIM=
 github.com/hyperledger/aries-framework-go-ext/component/vdr/indy v0.0.0-20220629202442-ce8776c10037 h1:dJS3Vm3VyRfdOlVgaLh2uVtysah3/VQLeaLQ0p0uw9I=
 github.com/hyperledger/aries-framework-go-ext/component/vdr/indy v0.0.0-20220629202442-ce8776c10037/go.mod h1:uKs8SUcJ8E1biEhsZbt8TIiUahDzvj3lh99yJq1g/dM=
+github.com/hyperledger/aries-framework-go/component/storage/edv v0.0.0-20220322085443-50e8f9bd208b h1:cZ1scj+jdCT6IYAXe/62CckfTXv1wr0vnFLh2biH2qQ=
+github.com/hyperledger/aries-framework-go/component/storage/edv v0.0.0-20220322085443-50e8f9bd208b/go.mod h1:eIac5lubCy3tw6D0sTluM5U6Bw3inBwUfjX17o2U7PE=
 github.com/hyperledger/aries-framework-go/component/storageutil v0.0.0-20210224230531-58e1368e5661/go.mod h1:XaPVDJcbQT8BKmThfQdWPc+hgicHFAQzSOavHw2gn/4=
 github.com/hyperledger/aries-framework-go/component/storageutil v0.0.0-20220322085443-50e8f9bd208b h1:IoD7+sHQRLMouwHjhrOj5vhg+rPt/aKl4P+WiBZVHVk=
 github.com/hyperledger/aries-framework-go/component/storageutil v0.0.0-20220322085443-50e8f9bd208b/go.mod h1:yLgRpVlZ2heeeOpTgvEnG/yHL9q1keUu5ILQ6s2qpLU=
@@ -197,7 +199,7 @@ github.com/hyperledger/aries-framework-go/spi v0.0.0-20210224230531-58e1368e5661
 github.com/hyperledger/aries-framework-go/spi v0.0.0-20220322085443-50e8f9bd208b h1:Fo9mK3eB+TiYu2/hbTWtt0kWg9j1QRqnnbQQqaytJzE=
 github.com/hyperledger/aries-framework-go/spi v0.0.0-20220322085443-50e8f9bd208b/go.mod h1:4bD5c5fj5K7rkQurVa/8I8+TfNcI4bxIBzaUNcxTOTg=
 github.com/hyperledger/aries-framework-go/test/component v0.0.0-20210219073333-c46e84ce678f/go.mod h1:/ljIFCu5iDIziwuvObF0vEc3fJ5dgDpT8RYAhQdNeHI=
-github.com/hyperledger/aries-framework-go/test/component v0.0.0-20210820153043-8b6f36d10ab9 h1:LX6OckfTI2CHFFVSaqKoZR4G2JxczZfsvvqplmiwJwA=
+github.com/hyperledger/aries-framework-go/test/component v0.0.0-20220217153004-1622c70e5767 h1:XyfULUaaWSj+JRaILaxTUHFh0CujzODJ5P4qJNjZM+w=
 github.com/hyperledger/indy-vdr/wrappers/golang v0.0.0-20201031155907-5f437d26ed71 h1:9maEq7epkI0SBEQf71TYZ4p9NR0P80W0PgYFT+Q7A1E=
 github.com/hyperledger/indy-vdr/wrappers/golang v0.0.0-20201031155907-5f437d26ed71/go.mod h1:htRxCX5yhKPWqOd8SsZeTcuElByzSfciuJSfpPMT09M=
 github.com/ianlancetaylor/demangle v0.0.0-20181102032728-5e5cf60278f6/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=

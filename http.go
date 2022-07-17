@@ -2,9 +2,8 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/gorilla/mux"
-	"github.com/hyperledger/aries-framework-go/pkg/client/didexchange"
+	"github.com/hyperledger/aries-framework-go/pkg/client/outofband"
 	"github.com/tryfix/log"
 	"io/ioutil"
 	"net/http"
@@ -13,56 +12,34 @@ import (
 type transport struct {
 	router *mux.Router
 	agent  *agent
+	store  *store
 	logger log.Logger
 }
 
-func initHttpClient(port string, agent *agent, logger log.Logger) {
+func initHttpClient(port string, agent *agent, store *store, logger log.Logger) {
 	t := &transport{
 		router: mux.NewRouter(),
 		agent:  agent,
+		store:  store,
 		logger: logger,
 	}
 
-	t.router.HandleFunc(`/connection/{id}`, t.handleGetConnection).Methods(http.MethodGet)
-	t.router.HandleFunc(`/connection/create-invitation`, t.handleCreateInvitation).Methods(http.MethodPut)
-	t.router.HandleFunc(`/connection/handle-invitation`, t.handleHandleInvitation).Methods(http.MethodPost)
+	t.router.HandleFunc(`/invitation/create`, t.handleCreateInvitation).Methods(http.MethodPut)
+	t.router.HandleFunc(`/invitation/accept`, t.handleAcceptInvitation).Methods(http.MethodPost)
 
 	// service endpoint
+	t.router.HandleFunc(`/invitation/service`, t.handleServiceEndpoint).Methods(http.MethodGet)
 
 	if err := http.ListenAndServe(":"+port, t.router); err != nil {
 		t.logger.Fatal(err)
 	}
 }
 
-func (t *transport) handleGetConnection(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	conn, err := t.agent.connection(params[`id`])
+func (t *transport) handleCreateInvitation(w http.ResponseWriter, _ *http.Request) {
+	inv, err := t.agent.createInv()
 	if err != nil {
 		t.logger.Fatal(err)
 	}
-
-	w.WriteHeader(http.StatusOK)
-	_, err = w.Write([]byte(conn.State))
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		t.logger.Fatal(err)
-	}
-}
-
-func (t *transport) handleCreateInvitation(w http.ResponseWriter, r *http.Request) {
-	inv, err := t.agent.createInvitation()
-	if err != nil {
-		t.logger.Fatal(err)
-	}
-
-	//fmt.Println("agent sending invitation ", inv.Invitation)
-	fmt.Println("type: ", inv.Type)
-	fmt.Println("id: ", inv.ID)
-	fmt.Println("label: ", inv.Label)
-	fmt.Println("rec keys: ", inv.RecipientKeys)
-	fmt.Println("endpoint: ", inv.ServiceEndpoint)
-	fmt.Println("routing keys: ", inv.RoutingKeys)
-	fmt.Println("did: ", inv.DID)
 
 	err = json.NewEncoder(w).Encode(inv)
 	if err != nil {
@@ -70,31 +47,31 @@ func (t *transport) handleCreateInvitation(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-func (t *transport) handleHandleInvitation(w http.ResponseWriter, r *http.Request) {
+func (t *transport) handleAcceptInvitation(_ http.ResponseWriter, r *http.Request) {
 	data, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		t.logger.Fatal(err)
 	}
-	defer r.Body.Close()
 
-	inv := didexchange.Invitation{}
-	err = json.Unmarshal(data, &inv)
+	var req outofband.Invitation
+	err = json.Unmarshal(data, &req)
 	if err != nil {
-		t.logger.Fatal("unmarshall error: ", err)
-	}
-
-	id, err := t.agent.handleInvitation(&inv)
-	if err != nil {
-		t.logger.Fatal("agent error: ", err)
-	}
-
-	fmt.Println("received inv: ", inv.Invitation)
-	fmt.Println("conn id (receiver): ", id)
-
-	w.WriteHeader(http.StatusOK)
-	_, err = w.Write([]byte(id))
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
 		t.logger.Fatal(err)
 	}
+
+	_, err = t.agent.acceptInv(&req)
+	if err != nil {
+		t.logger.Fatal(err)
+	}
+}
+
+//func (t *transport) handleGetConn(w http.ResponseWriter, r *http.Request) {
+//	err := t.store.getConn()
+//	if err != nil {
+//		t.logger.Fatal(err, t.store.connID)
+//	}
+//}
+
+func (t *transport) handleServiceEndpoint(w http.ResponseWriter, r *http.Request) {
+	t.logger.Info("service endpoint called")
 }

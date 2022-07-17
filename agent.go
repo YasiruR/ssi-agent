@@ -1,40 +1,29 @@
 package main
 
 import (
-	"errors"
-	"fmt"
 	"github.com/hyperledger/aries-framework-go-ext/component/vdr/indy"
-	"github.com/hyperledger/aries-framework-go/pkg/client/didexchange"
-	"github.com/hyperledger/aries-framework-go/pkg/didcomm/common/service"
+	"github.com/hyperledger/aries-framework-go/pkg/client/outofband"
 	"github.com/hyperledger/aries-framework-go/pkg/framework/aries"
+	"github.com/hyperledger/aries-framework-go/pkg/framework/context"
 	"github.com/tryfix/log"
 	"os"
 )
 
 type agent struct {
-	client *didexchange.Client
-	vdr    *indy.VDR
-	logger log.Logger
+	ctx       *context.Provider
+	oobClient *outofband.Client
+	vdr       *indy.VDR
+	logger    log.Logger
 }
 
 func initAgent(port string, logger log.Logger) *agent {
+	// initialize aries instance and context
 	framework, err := aries.New()
 	if err != nil {
 		logger.Fatal(err)
 	}
 
 	ctx, err := framework.Context()
-	if err != nil {
-		logger.Fatal(err)
-	}
-
-	client, err := didexchange.New(ctx)
-	if err != nil {
-		logger.Fatal(err)
-	}
-
-	clientActions := make(chan service.DIDCommAction, 1)
-	err = client.RegisterActionEvent(clientActions)
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -50,39 +39,31 @@ func initAgent(port string, logger log.Logger) *agent {
 		logger.Fatal(err)
 	}
 
+	// initialize out-of-band client
+	oobClient, err := outofband.New(ctx)
+	if err != nil {
+		logger.Fatal(err)
+	}
+
 	logger.Info("agent initialized")
-
-	//go service.AutoExecuteActionEvent(clientActions)
-	return &agent{client: client, vdr: vdr, logger: logger}
+	return &agent{ctx: ctx, oobClient: oobClient, vdr: vdr, logger: logger}
 }
 
-func (a *agent) createInvitation() (didexchange.Invitation, error) {
-	inv, err := a.client.CreateInvitation("ssi agent invites a user")
+func (a *agent) createInv() (*outofband.Invitation, error) {
+	inv, err := a.oobClient.CreateInvitation(nil)
 	if err != nil {
-		return didexchange.Invitation{}, err
+		return nil, err
 	}
 
-	return *inv, nil
+	return inv, nil
 }
 
-func (a *agent) handleInvitation(inv *didexchange.Invitation) (connID string, err error) {
-	connID, err = a.client.HandleInvitation(inv)
+func (a *agent) acceptInv(inv *outofband.Invitation) (string, error) {
+	connID, err := a.oobClient.AcceptInvitation(inv, "agent accepts invitation")
 	if err != nil {
-		return
+		return "", err
 	}
 
-	// create did doc
-	// create did for connection
-	// create connection request
-
-	return
-}
-
-func (a *agent) connection(id string) (didexchange.Connection, error) {
-	conn, err := a.client.GetConnection(id)
-	if err != nil {
-		return didexchange.Connection{}, errors.New(fmt.Sprintf("%s [%s]", err.Error(), id))
-	}
-
-	return *conn, nil
+	a.logger.Debug("out-of-band invitation accepted via agent", connID)
+	return connID, nil
 }

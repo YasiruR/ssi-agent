@@ -12,5 +12,10 @@ func main() {
 		log.WithFilePath(true),
 	)
 	args := os.Args
-	initHttpClient(args[1], initAgent(args[1], logger), logger)
+
+	ssiAgent := initAgent(args[1], logger)
+	s := newStore(args[1], logger)
+	s.init(ssiAgent.ctx)
+	defer s.Close()
+	initHttpClient(args[1], ssiAgent, s, logger)
 }
