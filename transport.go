@@ -21,7 +21,9 @@ func newHttpClient(port int, agent *agent, logger log.Logger) {
 
 	h.Router.HandleFunc(`/invitation/create`, h.handleCreateInv).Methods(http.MethodPut)
 	h.Router.HandleFunc(`/invitation/accept`, h.handleConnect).Methods(http.MethodPost)
+
 	h.Router.HandleFunc(`/connection`, h.handleGetConn).Methods(http.MethodGet)
+	h.Router.HandleFunc(`/send-offer`, h.handleSendOffer).Methods(http.MethodPost)
 
 	if err := http.ListenAndServe(":"+strconv.Itoa(port), h.Router); err != nil {
 		h.logger.Fatal(err)
@@ -74,4 +76,8 @@ func (h *httpClient) handleGetConn(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.logger.Fatal(err)
 	}
+}
+
+func (h *httpClient) handleSendOffer(w http.ResponseWriter, r *http.Request) {
+	h.agent.sendOffer()
 }
