@@ -2,18 +2,24 @@ package main
 
 import (
 	"fmt"
+	"github.com/google/uuid"
+	"github.com/hyperledger/aries-framework-go-ext/component/vdr/indy"
 	"github.com/hyperledger/aries-framework-go/component/storageutil/mem"
 	"github.com/hyperledger/aries-framework-go/pkg/client/didexchange"
 	"github.com/hyperledger/aries-framework-go/pkg/client/issuecredential"
 	"github.com/hyperledger/aries-framework-go/pkg/didcomm/common/service"
+	"github.com/hyperledger/aries-framework-go/pkg/didcomm/protocol/decorator"
 	issuecredential2 "github.com/hyperledger/aries-framework-go/pkg/didcomm/protocol/issuecredential"
 	"github.com/hyperledger/aries-framework-go/pkg/didcomm/transport/ws"
 	"github.com/hyperledger/aries-framework-go/pkg/framework/aries"
 	connPkg "github.com/hyperledger/aries-framework-go/pkg/store/connection"
+	"github.com/hyperledger/aries-framework-go/spi/storage"
 	"github.com/tryfix/log"
+	"os"
 	"strconv"
 )
 
+// did exchange structs
 type connection struct {
 	myDid           string
 	theirDid        string
@@ -24,11 +30,55 @@ type agent struct {
 	port   int
 	client *didexchange.Client
 	issuer *issuecredential.Client
+	vdr    *indy.VDR
+	store  storage.Store
 	conn   connection
 	logger log.Logger
 }
 
+// preview credential structs
+type attribute struct {
+	Name     string `json:"name"`
+	MimeType string `json:"mime-type"`
+	Value    string `json:"value"`
+}
+
+type previewCred struct {
+	Type       string      `json:"@type"`
+	Attributes []attribute `json:"attributes"`
+}
+
+// issue credential structs
+type jsonData struct {
+	Context           []string          `json:"@context"`
+	IssuanceDate      string            `json:"issuanceDate"`
+	Issuer            map[string]string `json:"issuer"`
+	ReferenceNumber   int64             `json:"referenceNumber"`
+	Type              []string          `json:"type"`
+	CredentialSubject struct {
+		ID string `json:"id"`
+	} `json:"credentialSubject"`
+}
+
 func newAgent(port int, logger log.Logger) *agent {
+	// indy vdr
+	pwd, err := os.Getwd()
+	if err != nil {
+		logger.Fatal(err)
+	}
+
+	vdr, err := indy.New(`sov`, indy.WithIndyVDRGenesisFile(pwd+`/src/genesis.json`))
+	if err != nil {
+		logger.Fatal(err)
+	}
+
+	// store
+	storeProv := mem.NewProvider()
+	wallet, err := storeProv.OpenStore(`wallet`)
+	if err != nil {
+		logger.Fatal(err)
+	}
+
 	// inbound transport for agent
 	address := fmt.Sprintf("localhost:%d", port+1)
 	inbound, err := ws.NewInbound(address, "ws://"+address, "", "")
@@ -40,8 +90,9 @@ func newAgent(port int, logger log.Logger) *agent {
 	fw, err := aries.New(
 		aries.WithInboundTransport(inbound),
 		aries.WithOutboundTransports(ws.NewOutbound()),
-		aries.WithStoreProvider(mem.NewProvider()),
+		aries.WithStoreProvider(storeProv),
 		aries.WithProtocolStateStoreProvider(mem.NewProvider()),
+		aries.WithVDR(vdr),
 	)
 	if err != nil {
 		logger.Fatal(err)
@@ -71,7 +122,7 @@ func newAgent(port int, logger log.Logger) *agent {
 		logger.Fatal(err)
 	}
 
-	a := &agent{port: port + 1, client: client, issuer: issuer, logger: logger}
+	a := &agent{port: port + 1, client: client, issuer: issuer, vdr: vdr, store: wallet, logger: logger}
 
 	issueActions := make(chan service.DIDCommAction)
 	err = issuer.RegisterActionEvent(issueActions)
@@ -129,14 +180,26 @@ func (a *agent) setConn(conn *didexchange.Connection) {
 }
 
 func (a *agent) sendOffer() {
-	if _, err := a.issuer.SendOffer(&issuecredential.OfferCredential{}, &connPkg.Record{
-		MyDID:    a.conn.myDid,
-		TheirDID: a.conn.theirDid,
-	}); err != nil {
+	rec := connPkg.Record{MyDID: a.conn.myDid, TheirDID: a.conn.theirDid}
+	offer := issuecredential.OfferCredential{
+		Type: "https://didcomm.org/issue-credential/2.0/offer-credential",
+		ID:   uuid.New().String(),
+		CredentialPreview: previewCred{
+			Type: "https://didcomm.org/issue-credential/2.0/credential-preview",
+			Attributes: []attribute{
+				{Name: "first_name", Value: "Alan"},
+				{Name: "role", Value: "developer"},
+				{Name: "country", Value: "Norway"},
+			},
+		},
+		Comment: "initial credential offer from agent " + strconv.Itoa(a.port),
+	}
+
+	if _, err := a.issuer.SendOffer(&offer, &rec); err != nil {
 		a.logger.Error(err)
 		return
 	}
-	a.logger.Debug("offer sent to the holder")
+	a.logger.Debug(fmt.Sprintf("offer sent to the holder \n[rec: %v] \n[offer: %v]", rec, offer))
 }
 
 func (a *agent) listen(issueActions chan service.DIDCommAction) {
@@ -152,8 +215,28 @@ func (a *agent) listen(issueActions chan service.DIDCommAction) {
 				a.logger.Debug("offer for credential is received")
 			}
 
+			attach := decorator.GenericAttachment{}
+			attach.ID = uuid.New().String()
+			attach.Data.JSON = jsonData{
+				Context:         []string{"https://www.w3.org/2018/credentials/v1", "https://www.w3.org/2018/credentials/examples/v1"},
+				IssuanceDate:    "2010-01-01T19:23:24Z",
+				Issuer:          map[string]string{"id": uuid.New().String()},
+				ReferenceNumber: 83294847,
+				Type:            []string{"VerifiableCredential"},
+				CredentialSubject: struct {
+					ID string `json:"id"`
+				}{"initial-verifiable-credential"},
+			}
+
 			if e.Message.Type() == issuecredential2.RequestCredentialMsgTypeV2 {
-				if err := a.issuer.AcceptRequest(piid, &issuecredential.IssueCredential{}); err != nil {
+				cred := issuecredential.IssueCredential{
+					Type:        "https://didcomm.org/issue-credential/2.0/issue-credential",
+					ID:          uuid.New().String(),
+					Comment:     "agent " + strconv.Itoa(a.port) + " issuing credential",
+					Attachments: []decorator.GenericAttachment{attach},
+				}
+
+				if err := a.issuer.AcceptRequest(piid, &cred); err != nil {
 					a.logger.Error(err)
 					continue
 				}
@@ -165,7 +248,14 @@ func (a *agent) listen(issueActions chan service.DIDCommAction) {
 					a.logger.Error(err)
 					continue
 				}
-				a.logger.Debug("credential has been issued")
+				a.logger.Debug("credential is received")
+
+				bytes, err := a.store.Get(piid)
+				if err != nil {
+					a.logger.Error("getting vc from store failed", err)
+					continue
+				}
+				a.logger.Debug("fetched credential from store", string(bytes))
 			}
 
 			if e.Message.Type() == issuecredential2.ProblemReportMsgTypeV3 {

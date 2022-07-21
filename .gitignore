@@ -1,3 +1,4 @@
 vendor
 .idea
 agent
+src/genesis.json
