@@ -67,7 +67,7 @@ func newAgent(port int, logger log.Logger) *agent {
 		logger.Fatal(err)
 	}
 
-	vdr, err := indy.New(`sov`, indy.WithIndyVDRGenesisFile(pwd+`/src/genesis.json`))
+	vdr, err := indy.New(`indy`, indy.WithIndyVDRGenesisFile(pwd+`/src/genesis.json`))
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -130,6 +130,8 @@ func newAgent(port int, logger log.Logger) *agent {
 		logger.Fatal(err)
 	}
 	go a.listen(issueActions)
+
+	a.read()
 
 	return a
 }
@@ -267,4 +269,26 @@ func (a *agent) listen(issueActions chan service.DIDCommAction) {
 			}
 		}
 	}
+}
+
+// todo remove
+func (a *agent) read() {
+	status, err := a.vdr.Client.GetPoolStatus()
+	if err != nil {
+		a.logger.Fatal(err)
+	}
+	a.logger.Info("status fetched from pool", status)
+
+	//nym, err := a.vdr.Client.GetNym("ByuET4QKgGkaiUYGuvS6x3wADnmbYmtSHBAJngaQRhNL")
+	//if err != nil {
+	//	a.logger.Error(err)
+	//}
+	//a.logger.Info("nym fetched", nym)
+
+	//doc, err := a.vdr.Read("did:indy:M9Z1siZMhVTdR3pH5zsxWm")
+	//if err != nil {
+	//	a.logger.Fatal(err)
+	//}
+	//
+	//a.logger.Info("did doc fetched", doc.DIDDocument)
 }
