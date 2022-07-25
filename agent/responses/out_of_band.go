@@ -54,3 +54,16 @@ type Invitation struct {
 	Trace         bool   `json:"trace"`
 	UpdatedAt     string `json:"updated_at"`
 }
+
+type Error struct {
+	ID          string `json:"@id"`
+	Type        string `json:"@type"`
+	Description struct {
+		Code string `json:"code"`
+		En   string `json:"en"`
+	} `json:"description"`
+	Impact string `json:"impact"`
+	Thread struct {
+		Pthid string `json:"pthid"`
+	} `json:"~thread"`
+}
