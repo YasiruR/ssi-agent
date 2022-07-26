@@ -27,6 +27,8 @@ func (s *Server) Serve() {
 	s.router.HandleFunc(`/invitation/create`, s.handleCreateInvitation).Methods(http.MethodPost)
 	s.router.HandleFunc(`/invitation/accept`, s.handleAcceptInvitation).Methods(http.MethodPost)
 
+	s.router.HandleFunc(`/connection/{id}`, s.handleGetConnection).Methods(http.MethodGet)
+
 	if err := http.ListenAndServe(":"+strconv.Itoa(s.port), s.router); err != nil {
 		s.logger.Fatal(err)
 	}
@@ -63,9 +65,32 @@ func (s *Server) handleAcceptInvitation(w http.ResponseWriter, r *http.Request) 
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 
-	err = s.agent.AcceptInvitation(req.Invitation)
+	res, err := s.agent.AcceptInvitation(req.Invitation)
 	if err != nil {
 		s.logger.Error(fmt.Sprintf(`accept invitation - %v`, err))
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	_, err = w.Write(res)
+	if err != nil {
+		s.logger.Error(fmt.Sprintf(`writing response - %v`, err))
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleGetConnection(w http.ResponseWriter, r *http.Request) {
+	connID := mux.Vars(r)[`id`]
+	res, err := s.agent.Connection(connID)
+	if err != nil {
+		s.logger.Error(fmt.Sprintf(`get connection - %v`, err))
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	_, err = w.Write(res)
+	if err != nil {
+		s.logger.Error(fmt.Sprintf(`writing response - %v`, err))
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 }

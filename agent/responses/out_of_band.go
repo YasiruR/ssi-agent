@@ -1,6 +1,6 @@
 package responses
 
-type Invitation struct {
+type CreateInvitation struct {
 	CreatedAt  string `json:"created_at"`
 	InviMsgID  string `json:"invi_msg_id"`
 	Invitation struct {
