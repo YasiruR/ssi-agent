@@ -56,7 +56,7 @@ func (a *Agent) CreateInvitation() (response []byte, err error) {
 
 	res, err := a.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("servers error - %v", err)
+		return nil, fmt.Errorf("transport error - %v", err)
 	}
 	defer res.Body.Close()
 
@@ -96,7 +96,7 @@ func (a *Agent) AcceptInvitation(inv domain.Invitation) (response []byte, err er
 
 	res, err := a.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("servers error - %v", err)
+		return nil, fmt.Errorf("transport error - %v", err)
 	}
 	defer res.Body.Close()
 
@@ -119,7 +119,7 @@ func (a *Agent) AcceptInvitation(inv domain.Invitation) (response []byte, err er
 
 	res, err = a.client.Post(a.adminUrl+endpointConn+accInv.ConnectionID+`/accept-invitation`, `application/json`, nil)
 	if err != nil {
-		return nil, fmt.Errorf("accept servers error - %v", err)
+		return nil, fmt.Errorf("accept transport error - %v", err)
 	}
 	defer res.Body.Close()
 
@@ -139,7 +139,7 @@ func (a *Agent) AcceptInvitation(inv domain.Invitation) (response []byte, err er
 //func (a *Agent) Connection(connID string) (response []byte, err error) {
 //	res, err := a.client.Get(a.adminUrl + endpointConn + connID)
 //	if err != nil {
-//		return nil, fmt.Errorf("servers error - %v", err)
+//		return nil, fmt.Errorf("transport error - %v", err)
 //	}
 //	defer res.Body.Close()
 //
@@ -165,7 +165,7 @@ func (a *Agent) AcceptInvitation(inv domain.Invitation) (response []byte, err er
 //func (a *Agent) AcceptRequest(connID string) (response []byte, err error) {
 //	res, err := a.client.Post(a.adminUrl+endpointConn+connID+`/accept-request`, `application/json`, nil)
 //	if err != nil {
-//		return nil, fmt.Errorf("servers error - %v", err)
+//		return nil, fmt.Errorf("transport error - %v", err)
 //	}
 //	defer res.Body.Close()
 //

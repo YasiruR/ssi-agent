@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/YasiruR/agent/agent"
-	"github.com/YasiruR/agent/servers/agent/requests"
+	"github.com/YasiruR/agent/transport/agent/requests"
 	"github.com/gorilla/mux"
 	"github.com/tryfix/log"
 	"io/ioutil"
@@ -27,9 +27,7 @@ func (s *Server) Serve() {
 	s.router.HandleFunc(`/invitation/create`, s.handleCreateInvitation).Methods(http.MethodPost)
 	s.router.HandleFunc(`/invitation/accept`, s.handleAcceptInvitation).Methods(http.MethodPost)
 
-	s.router.HandleFunc(`/connection/{id}`, s.handleGetConnection).Methods(http.MethodGet)
-	s.router.HandleFunc(`/connection/accept/{id}`, s.handleAcceptConnection).Methods(http.MethodPost)
-
+	s.logger.Info(fmt.Sprintf("controller started listening on %d", s.port))
 	if err := http.ListenAndServe(":"+strconv.Itoa(s.port), s.router); err != nil {
 		s.logger.Fatal(err)
 	}
@@ -52,14 +50,14 @@ func (s *Server) handleCreateInvitation(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *Server) handleAcceptInvitation(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
 	data, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		s.logger.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
 	}
+	defer r.Body.Close()
 
-	var req requests.AcceptInv
+	var req requests.AcceptInvitation
 	err = json.Unmarshal(data, &req)
 	if err != nil {
 		s.logger.Error(err)
@@ -80,34 +78,34 @@ func (s *Server) handleAcceptInvitation(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-func (s *Server) handleGetConnection(w http.ResponseWriter, r *http.Request) {
-	connID := mux.Vars(r)[`id`]
-	res, err := s.agent.Connection(connID)
-	if err != nil {
-		s.logger.Error(fmt.Sprintf(`get connection - %v`, err))
-		w.WriteHeader(http.StatusInternalServerError)
-	}
-
-	w.WriteHeader(http.StatusOK)
-	_, err = w.Write(res)
-	if err != nil {
-		s.logger.Error(fmt.Sprintf(`writing response - %v`, err))
-		w.WriteHeader(http.StatusInternalServerError)
-	}
-}
-
-func (s *Server) handleAcceptConnection(w http.ResponseWriter, r *http.Request) {
-	connID := mux.Vars(r)[`id`]
-	res, err := s.agent.AcceptRequest(connID)
-	if err != nil {
-		s.logger.Error(fmt.Sprintf(`get connection - %v`, err))
-		w.WriteHeader(http.StatusInternalServerError)
-	}
-
-	w.WriteHeader(http.StatusOK)
-	_, err = w.Write(res)
-	if err != nil {
-		s.logger.Error(fmt.Sprintf(`writing response - %v`, err))
-		w.WriteHeader(http.StatusInternalServerError)
-	}
-}
+//func (s *Server) handleGetConnection(w http.ResponseWriter, r *http.Request) {
+//	connID := mux.Vars(r)[`id`]
+//	res, err := s.agent.Connection(connID)
+//	if err != nil {
+//		s.logger.Error(fmt.Sprintf(`get connection - %v`, err))
+//		w.WriteHeader(http.StatusInternalServerError)
+//	}
+//
+//	w.WriteHeader(http.StatusOK)
+//	_, err = w.Write(res)
+//	if err != nil {
+//		s.logger.Error(fmt.Sprintf(`writing response - %v`, err))
+//		w.WriteHeader(http.StatusInternalServerError)
+//	}
+//}
+//
+//func (s *Server) handleAcceptConnection(w http.ResponseWriter, r *http.Request) {
+//	connID := mux.Vars(r)[`id`]
+//	res, err := s.agent.AcceptRequest(connID)
+//	if err != nil {
+//		s.logger.Error(fmt.Sprintf(`get connection - %v`, err))
+//		w.WriteHeader(http.StatusInternalServerError)
+//	}
+//
+//	w.WriteHeader(http.StatusOK)
+//	_, err = w.Write(res)
+//	if err != nil {
+//		s.logger.Error(fmt.Sprintf(`writing response - %v`, err))
+//		w.WriteHeader(http.StatusInternalServerError)
+//	}
+//}
