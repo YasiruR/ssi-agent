@@ -19,6 +19,8 @@ const (
 	endpointAcceptInv = `/connections/receive-invitation`
 	endpointConn      = `/connections/`
 	endpointSchemas   = `/schemas`
+	endpointCredDef   = `/credential-definitions`
+	endpointSendOffer = `/issue-credential-2.0/send-offer`
 )
 
 type Agent struct {
@@ -68,13 +70,13 @@ func (a *Agent) CreateInvitation() (response []byte, err error) {
 	}
 	defer res.Body.Close()
 
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("response error - %d", res.StatusCode)
+	}
+
 	data, err = ioutil.ReadAll(res.Body)
 	if err != nil {
 		return nil, fmt.Errorf("reading body - %v", err)
-	}
-
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("response error - %d", res.StatusCode)
 	}
 
 	var inv responses.CreateInvitation
@@ -117,13 +119,13 @@ func (a *Agent) receiveInvitation(inv domain.Invitation) (*responses.ReceiveInvi
 	}
 	defer res.Body.Close()
 
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("response error - %d", res.StatusCode)
+	}
+
 	data, err = ioutil.ReadAll(res.Body)
 	if err != nil {
 		return nil, fmt.Errorf("reading body - %v", err)
-	}
-
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("response error - %d", res.StatusCode)
 	}
 
 	var recInv responses.ReceiveInvitation
@@ -153,13 +155,13 @@ func (a *Agent) acceptInvitation(connID string) (response []byte, err error) {
 	}
 	defer res.Body.Close()
 
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("accept response error - %d", res.StatusCode)
+	}
+
 	data, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return nil, fmt.Errorf("accept reading body - %v", err)
-	}
-
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("accept response error - %d", res.StatusCode)
 	}
 
 	a.logger.Debug("invitation accepted for did-exchange protocol")
@@ -184,13 +186,13 @@ func (a *Agent) AcceptRequest(label string) (response []byte, err error) {
 	}
 	defer res.Body.Close()
 
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("response error - %d", res.StatusCode)
+	}
+
 	data, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return nil, fmt.Errorf("reading body - %v", err)
-	}
-
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("response error - %d", res.StatusCode)
 	}
 
 	a.logger.Debug("connection request accepted", connID)
@@ -224,6 +226,7 @@ func (a *Agent) Connection(connID string) (response []byte, err error) {
 	return data, nil
 }
 
+// CreateSchema forwards the received schema directly to the agent (needs to be a Trust Anchor)
 func (a *Agent) CreateSchema(schema []byte) (response []byte, err error) {
 	res, err := a.client.Post(a.adminUrl+endpointSchemas, `application/json`, bytes.NewBuffer(schema))
 	if err != nil {
@@ -231,15 +234,78 @@ func (a *Agent) CreateSchema(schema []byte) (response []byte, err error) {
 	}
 	defer res.Body.Close()
 
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("response error - %d", res.StatusCode)
+	}
+
 	data, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return nil, fmt.Errorf("reading body - %v", err)
 	}
 
+	a.logger.Debug("schema created")
+	return data, nil
+}
+
+func (a *Agent) CreateCredentialDef(def []byte) (response []byte, err error) {
+	res, err := a.client.Post(a.adminUrl+endpointCredDef, `application/json`, bytes.NewBuffer(def))
+	if err != nil {
+		return nil, fmt.Errorf(`transport error - %v`, err)
+	}
+	defer res.Body.Close()
+
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("response error - %d", res.StatusCode)
 	}
 
-	a.logger.Debug("schema created")
+	data, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading body - %v", err)
+	}
+
+	a.logger.Debug("credential definition created")
 	return data, nil
 }
+
+// todo
+//func (a *Agent) SendOffer(cp domain.CredentialPreview, to string) (response []byte, err error) {
+//	req := requests.Offer{}
+//	val, ok := a.conns.Load(to)
+//	if !ok {
+//		return nil, fmt.Errorf(`no connection found for the recipient %s`, to)
+//	}
+//
+//	connID, ok := val.(string)
+//	if !ok {
+//		return nil, fmt.Errorf(`connection ID corresponding to the recipient is not a string`)
+//	}
+//
+//	req.ConnectionID = connID
+//	req.CredentialPreview = cp
+//	req.Comment = `credential offer from ` + a.name
+//	req.Filter.Indy = struct{}{}
+//	a.logger.Debug("credential offer constructed", req)
+//
+//	data, err := json.Marshal(req)
+//	if err != nil {
+//		return nil, fmt.Errorf(`marshal error - %v`, err)
+//	}
+//
+//	res, err := a.client.Post(a.adminUrl+endpointSendOffer, `application/json`, bytes.NewBuffer(data))
+//	if err != nil {
+//		return nil, fmt.Errorf(`transport error - %v`, err)
+//	}
+//	defer res.Body.Close()
+//
+//	if res.StatusCode != http.StatusOK {
+//		return nil, fmt.Errorf("response error - %d", res.StatusCode)
+//	}
+//
+//	data, err = ioutil.ReadAll(res.Body)
+//	if err != nil {
+//		return nil, fmt.Errorf("reading body - %v", err)
+//	}
+//
+//	a.logger.Debug(fmt.Sprintf("offer sent to %s", to))
+//	return data, nil
+//}

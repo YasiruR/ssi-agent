@@ -31,6 +31,8 @@ func (s *Server) Serve() {
 	s.router.HandleFunc(`/connection/accept-request/{their_label}`, s.handleAcceptRequest).Methods(http.MethodPost)
 
 	s.router.HandleFunc(`/schema/create`, s.handleCreateSchema).Methods(http.MethodPost)
+	s.router.HandleFunc(`/credential-definition/create`, s.handleCreateCredentialDef).Methods(http.MethodPost)
+	//s.router.HandleFunc(`/credential/offer/{receiver}`, s.handleSendOffer).Methods(http.MethodPost)
 
 	s.logger.Info(fmt.Sprintf("controller started listening on %d", s.port))
 	if err := http.ListenAndServe(":"+strconv.Itoa(s.port), s.router); err != nil {
@@ -143,3 +145,70 @@ func (s *Server) handleCreateSchema(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 }
+
+func (s *Server) handleCreateCredentialDef(w http.ResponseWriter, r *http.Request) {
+	data, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		s.logger.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	defer r.Body.Close()
+
+	res, err := s.agent.CreateCredentialDef(data)
+	if err != nil {
+		s.logger.Error(fmt.Sprintf(`create schema - %v`, err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	_, err = w.Write(res)
+	if err != nil {
+		s.logger.Error(fmt.Sprintf(`writing response - %v`, err))
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+}
+
+// todo
+//func (s *Server) handleSendOffer(w http.ResponseWriter, r *http.Request) {
+//	receiver := mux.Vars(r)[`receiver`]
+//	data, err := ioutil.ReadAll(r.Body)
+//	if err != nil {
+//		s.logger.Error(err)
+//		w.WriteHeader(http.StatusInternalServerError)
+//		return
+//	}
+//	defer r.Body.Close()
+//
+//	var cp domain.CredentialPreview
+//	err = json.Unmarshal(data, &cp)
+//	if err != nil {
+//		s.logger.Error(err)
+//		w.WriteHeader(http.StatusInternalServerError)
+//		return
+//	}
+//
+//	res, err := s.agent.SendOffer(cp, receiver)
+//	if err != nil {
+//		s.logger.Error(fmt.Sprintf(`send offer - %v`, err))
+//		w.WriteHeader(http.StatusInternalServerError)
+//		return
+//	}
+//
+//	w.WriteHeader(http.StatusOK)
+//	_, err = w.Write(res)
+//	if err != nil {
+//		s.logger.Error(fmt.Sprintf(`writing response - %v`, err))
+//		w.WriteHeader(http.StatusInternalServerError)
+//	}
+//}
+//
+//func (s *Server) writeResponse(res []byte, w http.ResponseWriter) {
+//	w.WriteHeader(http.StatusOK)
+//	_, err := w.Write(res)
+//	if err != nil {
+//		s.logger.Error(fmt.Sprintf(`writing response - %v`, err))
+//		w.WriteHeader(http.StatusInternalServerError)
+//	}
+//}
