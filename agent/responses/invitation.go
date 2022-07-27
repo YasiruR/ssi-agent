@@ -8,7 +8,7 @@ type CreateInvitation struct {
 	InvitationURL string            `json:"invitation_url"`
 }
 
-type AcceptInvitation struct {
+type ReceiveInvitation struct {
 	Accept              string `json:"accept"`
 	Alias               string `json:"alias"`
 	ConnectionID        string `json:"connection_id"`

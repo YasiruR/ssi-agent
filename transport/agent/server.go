@@ -27,13 +27,15 @@ func (s *Server) Serve() {
 	s.router.HandleFunc(`/invitation/create`, s.handleCreateInvitation).Methods(http.MethodPost)
 	s.router.HandleFunc(`/invitation/accept`, s.handleAcceptInvitation).Methods(http.MethodPost)
 
+	s.router.HandleFunc(`/connection/accept-request/{their_label}`, s.handleAcceptRequest).Methods(http.MethodPost)
+
 	s.logger.Info(fmt.Sprintf("controller started listening on %d", s.port))
 	if err := http.ListenAndServe(":"+strconv.Itoa(s.port), s.router); err != nil {
 		s.logger.Fatal(err)
 	}
 }
 
-func (s *Server) handleCreateInvitation(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleCreateInvitation(w http.ResponseWriter, _ *http.Request) {
 	res, err := s.agent.CreateInvitation()
 	if err != nil {
 		s.logger.Error(fmt.Sprintf(`create invitation - %v`, err))
@@ -54,6 +56,7 @@ func (s *Server) handleAcceptInvitation(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		s.logger.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	defer r.Body.Close()
 
@@ -62,12 +65,31 @@ func (s *Server) handleAcceptInvitation(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		s.logger.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
 	res, err := s.agent.AcceptInvitation(req.Invitation)
 	if err != nil {
 		s.logger.Error(fmt.Sprintf(`accept invitation - %v`, err))
 		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	_, err = w.Write(res)
+	if err != nil {
+		s.logger.Error(fmt.Sprintf(`writing response - %v`, err))
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) handleAcceptRequest(w http.ResponseWriter, r *http.Request) {
+	label := mux.Vars(r)[`their_label`]
+	res, err := s.agent.AcceptRequest(label)
+	if err != nil {
+		s.logger.Error(fmt.Sprintf(`accept request - %v`, err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
 	w.WriteHeader(http.StatusOK)

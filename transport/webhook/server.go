@@ -32,19 +32,20 @@ func (s *Server) Serve() {
 	}
 }
 
-func (s *Server) handleConnections(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleConnections(_ http.ResponseWriter, r *http.Request) {
 	data, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		s.logger.Error(err)
-		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
 	var req requests.Connections
 	err = json.Unmarshal(data, &req)
 	if err != nil {
 		s.logger.Error(err)
-		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 
 	s.logger.Debug("webhook received for connection", req)
+	s.agent.AddConnection(req.TheirLabel, req.ConnectionID)
 }

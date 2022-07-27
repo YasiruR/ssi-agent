@@ -6,18 +6,20 @@ import (
 	agentServer "github.com/YasiruR/agent/transport/agent"
 	webhookServer "github.com/YasiruR/agent/transport/webhook"
 	"github.com/tryfix/log"
+	"strconv"
 )
 
 func main() {
-	controllerPort, webhookPort, url := parseArgs()
+	name, controllerPort, webhookPort, url := parseArgs()
 	logger := log.Constructor.Log(log.WithColors(true), log.WithLevel("DEBUG"), log.WithFilePath(true))
 
-	a := agent.New(controllerPort, url, logger)
+	a := agent.New(name, url, logger)
 	go webhookServer.New(webhookPort, a, logger).Serve()
 	agentServer.New(controllerPort, a, logger).Serve()
 }
 
-func parseArgs() (controllerPort, webhookPort int, url string) {
+func parseArgs() (name string, controllerPort, webhookPort int, url string) {
+	l := flag.String(`label`, ``, `label of the agent`)
 	cp := flag.Int(`controller_port`, 0, `port of the controller`)
 	wp := flag.Int(`webhook_port`, 0, `port of the webhook processor`)
 	u := flag.String(`agent_url`, ``, `url of the agent`)
@@ -31,5 +33,9 @@ func parseArgs() (controllerPort, webhookPort int, url string) {
 		log.Fatal(`port for webhook processor must be specified`)
 	}
 
-	return *cp, *wp, *u
+	if *l == `` {
+		*l = strconv.Itoa(*cp)
+	}
+
+	return *l, *cp, *wp, *u
 }
