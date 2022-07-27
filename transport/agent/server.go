@@ -27,6 +27,7 @@ func (s *Server) Serve() {
 	s.router.HandleFunc(`/invitation/create`, s.handleCreateInvitation).Methods(http.MethodPost)
 	s.router.HandleFunc(`/invitation/accept`, s.handleAcceptInvitation).Methods(http.MethodPost)
 
+	s.router.HandleFunc(`/connection/{id}`, s.handleGetConnection).Methods(http.MethodGet)
 	s.router.HandleFunc(`/connection/accept-request/{their_label}`, s.handleAcceptRequest).Methods(http.MethodPost)
 
 	s.logger.Info(fmt.Sprintf("controller started listening on %d", s.port))
@@ -100,34 +101,19 @@ func (s *Server) handleAcceptRequest(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-//func (s *Server) handleGetConnection(w http.ResponseWriter, r *http.Request) {
-//	connID := mux.Vars(r)[`id`]
-//	res, err := s.agent.Connection(connID)
-//	if err != nil {
-//		s.logger.Error(fmt.Sprintf(`get connection - %v`, err))
-//		w.WriteHeader(http.StatusInternalServerError)
-//	}
-//
-//	w.WriteHeader(http.StatusOK)
-//	_, err = w.Write(res)
-//	if err != nil {
-//		s.logger.Error(fmt.Sprintf(`writing response - %v`, err))
-//		w.WriteHeader(http.StatusInternalServerError)
-//	}
-//}
-//
-//func (s *Server) handleAcceptConnection(w http.ResponseWriter, r *http.Request) {
-//	connID := mux.Vars(r)[`id`]
-//	res, err := s.agent.AcceptRequest(connID)
-//	if err != nil {
-//		s.logger.Error(fmt.Sprintf(`get connection - %v`, err))
-//		w.WriteHeader(http.StatusInternalServerError)
-//	}
-//
-//	w.WriteHeader(http.StatusOK)
-//	_, err = w.Write(res)
-//	if err != nil {
-//		s.logger.Error(fmt.Sprintf(`writing response - %v`, err))
-//		w.WriteHeader(http.StatusInternalServerError)
-//	}
-//}
+func (s *Server) handleGetConnection(w http.ResponseWriter, r *http.Request) {
+	connID := mux.Vars(r)[`id`]
+	res, err := s.agent.Connection(connID)
+	if err != nil {
+		s.logger.Error(fmt.Sprintf(`get connection - %v`, err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	_, err = w.Write(res)
+	if err != nil {
+		s.logger.Error(fmt.Sprintf(`writing response - %v`, err))
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+}

@@ -196,54 +196,28 @@ func (a *Agent) AcceptRequest(label string) (response []byte, err error) {
 	return data, nil
 }
 
-//func (a *Agent) Connection(connID string) (response []byte, err error) {
-//	res, err := a.client.Get(a.adminUrl + endpointConn + connID)
-//	if err != nil {
-//		return nil, fmt.Errorf("transport error - %v", err)
-//	}
-//	defer res.Body.Close()
-//
-//	if res.StatusCode != http.StatusOK {
-//		return nil, fmt.Errorf("response error - %d", res.StatusCode)
-//	}
-//
-//	data, err := ioutil.ReadAll(res.Body)
-//	if err != nil {
-//		return nil, fmt.Errorf("reading response - %v", err)
-//	}
-//
-//	var conn domain.Connection
-//	err = json.Unmarshal(data, &conn)
-//	if err != nil {
-//		return nil, fmt.Errorf("unmarshal error - %v", err)
-//	}
-//
-//	a.logger.Debug("connection fetched", conn)
-//	return data, nil
-//}
-//
-//func (a *Agent) AcceptRequest(connID string) (response []byte, err error) {
-//	res, err := a.client.Post(a.adminUrl+endpointConn+connID+`/accept-request`, `application/json`, nil)
-//	if err != nil {
-//		return nil, fmt.Errorf("transport error - %v", err)
-//	}
-//	defer res.Body.Close()
-//
-//	if res.StatusCode != http.StatusOK {
-//		return nil, fmt.Errorf("response error - %d", res.StatusCode)
-//	}
-//
-//	data, err := ioutil.ReadAll(res.Body)
-//	if err != nil {
-//		return nil, fmt.Errorf("reading response - %v", err)
-//	}
-//
-//	var connReq responses.ConnRequest
-//	err = json.Unmarshal(data, &connReq)
-//	if err != nil {
-//		return nil, fmt.Errorf("unmarshal error - %v", err)
-//	}
-//
-//	a.logger.Debug("connection request accepted", connReq)
-//	return data, nil
-//}
+func (a *Agent) Connection(connID string) (response []byte, err error) {
+	res, err := a.client.Get(a.adminUrl + endpointConn + connID)
+	if err != nil {
+		return nil, fmt.Errorf("transport error - %v", err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("response error - %d", res.StatusCode)
+	}
+
+	data, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading response - %v", err)
+	}
+
+	var conn domain.Connection
+	err = json.Unmarshal(data, &conn)
+	if err != nil {
+		return nil, fmt.Errorf("unmarshal error - %v", err)
+	}
+
+	a.logger.Debug("connection fetched", conn)
+	return data, nil
+}
