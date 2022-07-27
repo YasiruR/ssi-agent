@@ -267,45 +267,44 @@ func (a *Agent) CreateCredentialDef(def []byte) (response []byte, err error) {
 	return data, nil
 }
 
-// todo
-//func (a *Agent) SendOffer(cp domain.CredentialPreview, to string) (response []byte, err error) {
-//	req := requests.Offer{}
-//	val, ok := a.conns.Load(to)
-//	if !ok {
-//		return nil, fmt.Errorf(`no connection found for the recipient %s`, to)
-//	}
-//
-//	connID, ok := val.(string)
-//	if !ok {
-//		return nil, fmt.Errorf(`connection ID corresponding to the recipient is not a string`)
-//	}
-//
-//	req.ConnectionID = connID
-//	req.CredentialPreview = cp
-//	req.Comment = `credential offer from ` + a.name
-//	req.Filter.Indy = struct{}{}
-//	a.logger.Debug("credential offer constructed", req)
-//
-//	data, err := json.Marshal(req)
-//	if err != nil {
-//		return nil, fmt.Errorf(`marshal error - %v`, err)
-//	}
-//
-//	res, err := a.client.Post(a.adminUrl+endpointSendOffer, `application/json`, bytes.NewBuffer(data))
-//	if err != nil {
-//		return nil, fmt.Errorf(`transport error - %v`, err)
-//	}
-//	defer res.Body.Close()
-//
-//	if res.StatusCode != http.StatusOK {
-//		return nil, fmt.Errorf("response error - %d", res.StatusCode)
-//	}
-//
-//	data, err = ioutil.ReadAll(res.Body)
-//	if err != nil {
-//		return nil, fmt.Errorf("reading body - %v", err)
-//	}
-//
-//	a.logger.Debug(fmt.Sprintf("offer sent to %s", to))
-//	return data, nil
-//}
+func (a *Agent) SendOffer(cp domain.CredentialPreview, to string) (response []byte, err error) {
+	req := requests.Offer{}
+	val, ok := a.conns.Load(to)
+	if !ok {
+		return nil, fmt.Errorf(`no connection found for the recipient %s`, to)
+	}
+
+	connID, ok := val.(string)
+	if !ok {
+		return nil, fmt.Errorf(`connection ID corresponding to the recipient is not a string`)
+	}
+
+	req.ConnectionID = connID
+	req.CredentialPreview = cp
+	req.Comment = `credential offer from ` + a.name
+	req.Filter.Indy = struct{}{}
+	a.logger.Debug("credential offer constructed", req)
+
+	data, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf(`marshal error - %v`, err)
+	}
+
+	res, err := a.client.Post(a.adminUrl+endpointSendOffer, `application/json`, bytes.NewBuffer(data))
+	if err != nil {
+		return nil, fmt.Errorf(`transport error - %v`, err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("response error - %d", res.StatusCode)
+	}
+
+	data, err = ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading body - %v", err)
+	}
+
+	a.logger.Debug(fmt.Sprintf("offer sent to %s", to))
+	return data, nil
+}

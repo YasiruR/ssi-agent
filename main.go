@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"github.com/YasiruR/agent/agent"
 	agentServer "github.com/YasiruR/agent/transport/agent"
 	webhookServer "github.com/YasiruR/agent/transport/webhook"
@@ -35,6 +36,7 @@ func parseArgs() (name string, controllerPort, webhookPort int, url string) {
 
 	if *l == `` {
 		*l = strconv.Itoa(*cp)
+		log.Info(fmt.Sprintf(`agent label is set to the controller port [%d] since not provided explicitly`, *cp))
 	}
 
 	return *l, *cp, *wp, *u
