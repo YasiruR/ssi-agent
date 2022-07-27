@@ -18,6 +18,7 @@ const (
 	endpointCreateInv = `/connections/create-invitation`
 	endpointAcceptInv = `/connections/receive-invitation`
 	endpointConn      = `/connections/`
+	endpointSchemas   = `/schemas`
 )
 
 type Agent struct {
@@ -179,23 +180,24 @@ func (a *Agent) AcceptRequest(label string) (response []byte, err error) {
 
 	res, err := a.client.Post(a.adminUrl+endpointConn+connID+`/accept-request`, `application/json`, nil)
 	if err != nil {
-		return nil, fmt.Errorf("accept transport error - %v", err)
+		return nil, fmt.Errorf("transport error - %v", err)
 	}
 	defer res.Body.Close()
 
 	data, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return nil, fmt.Errorf("accept reading body - %v", err)
+		return nil, fmt.Errorf("reading body - %v", err)
 	}
 
 	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("accept response error - %d", res.StatusCode)
+		return nil, fmt.Errorf("response error - %d", res.StatusCode)
 	}
 
 	a.logger.Debug("connection request accepted", connID)
 	return data, nil
 }
 
+// Connection fetches connection details for the given ID from agent endpoint and returns the response
 func (a *Agent) Connection(connID string) (response []byte, err error) {
 	res, err := a.client.Get(a.adminUrl + endpointConn + connID)
 	if err != nil {
@@ -219,5 +221,25 @@ func (a *Agent) Connection(connID string) (response []byte, err error) {
 	}
 
 	a.logger.Debug("connection fetched", conn)
+	return data, nil
+}
+
+func (a *Agent) CreateSchema(schema []byte) (response []byte, err error) {
+	res, err := a.client.Post(a.adminUrl+endpointSchemas, `application/json`, bytes.NewBuffer(schema))
+	if err != nil {
+		return nil, fmt.Errorf(`transport error - %v`, err)
+	}
+	defer res.Body.Close()
+
+	data, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading body - %v", err)
+	}
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("response error - %d", res.StatusCode)
+	}
+
+	a.logger.Debug("schema created")
 	return data, nil
 }
