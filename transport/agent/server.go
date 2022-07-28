@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/YasiruR/agent/agent"
-	"github.com/YasiruR/agent/domain"
 	"github.com/YasiruR/agent/transport/agent/requests"
 	"github.com/gorilla/mux"
 	"github.com/tryfix/log"
@@ -151,15 +150,15 @@ func (s *Server) handleSendOffer(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	var cp domain.CredentialPreview
-	err = json.Unmarshal(data, &cp)
+	var req requests.Offer
+	err = json.Unmarshal(data, &req)
 	if err != nil {
 		s.logger.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	res, err := s.agent.SendOffer(cp, receiver)
+	res, err := s.agent.SendOffer(req.CredPreview, req.Filter.Indy, receiver)
 	if err != nil {
 		s.logger.Error(fmt.Sprintf(`send offer - %v`, err))
 		w.WriteHeader(http.StatusInternalServerError)

@@ -267,7 +267,7 @@ func (a *Agent) CreateCredentialDef(def []byte) (response []byte, err error) {
 	return data, nil
 }
 
-func (a *Agent) SendOffer(cp domain.CredentialPreview, to string) (response []byte, err error) {
+func (a *Agent) SendOffer(cp domain.CredentialPreview, indySchema domain.IndySchemaMeta, to string) (response []byte, err error) {
 	req := requests.Offer{}
 	val, ok := a.conns.Load(to)
 	if !ok {
@@ -281,8 +281,8 @@ func (a *Agent) SendOffer(cp domain.CredentialPreview, to string) (response []by
 
 	req.ConnectionID = connID
 	req.CredentialPreview = cp
+	req.Filter.Indy = indySchema
 	req.Comment = `credential offer from ` + a.name
-	req.Filter.Indy = struct{}{}
 	a.logger.Debug("credential offer constructed", req)
 
 	data, err := json.Marshal(req)

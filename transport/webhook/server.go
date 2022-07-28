@@ -49,3 +49,21 @@ func (s *Server) handleConnections(_ http.ResponseWriter, r *http.Request) {
 	s.logger.Debug("webhook received for connection", req)
 	s.agent.AddConnection(req.TheirLabel, req.ConnectionID)
 }
+
+func (s *Server) handleCredentials(_ http.ResponseWriter, r *http.Request) {
+	data, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		s.logger.Error(err)
+		return
+	}
+
+	var req requests.Credentials
+	err = json.Unmarshal(data, &req)
+	if err != nil {
+		s.logger.Error(err)
+		return
+	}
+
+	s.logger.Debug("webhook received for credentials", req)
+	// todo continue
+}
