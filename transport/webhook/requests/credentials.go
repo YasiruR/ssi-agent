@@ -1,7 +1,6 @@
 package requests
 
-// todo check
-type Credentials struct {
+type IssueCredentials struct {
 	AutoIssue    bool   `json:"auto_issue"`
 	AutoOffer    bool   `json:"auto_offer"`
 	AutoRemove   bool   `json:"auto_remove"`
@@ -90,5 +89,21 @@ type Credentials struct {
 	State     string `json:"state"`
 	ThreadID  string `json:"thread_id"`
 	Trace     bool   `json:"trace"`
+	UpdatedAt string `json:"updated_at"`
+}
+
+type IssueCredentialsIndy struct {
+	CreatedAt           string `json:"created_at"`
+	CredExID            string `json:"cred_ex_id"`
+	CredExIndyID        string `json:"cred_ex_indy_id"`
+	CredRequestMetadata struct {
+		MasterSecretBlindingData struct {
+			VPrime  string      `json:"v_prime"`
+			VrPrime interface{} `json:"vr_prime"`
+		} `json:"master_secret_blinding_data"`
+		MasterSecretName string `json:"master_secret_name"`
+		Nonce            string `json:"nonce"`
+	} `json:"cred_request_metadata"`
+	RevRegID  string `json:"rev_reg_id"`
 	UpdatedAt string `json:"updated_at"`
 }

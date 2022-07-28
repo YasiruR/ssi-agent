@@ -21,6 +21,7 @@ const (
 	endpointSchemas   = `/schemas`
 	endpointCredDef   = `/credential-definitions`
 	endpointSendOffer = `/issue-credential-2.0/send-offer`
+	endpointRecords   = `/issue-credential-2.0/records/`
 )
 
 type Agent struct {
@@ -29,6 +30,7 @@ type Agent struct {
 	client   *http.Client
 	logger   log.Logger
 	conns    *sync.Map // peer label to own connection ID map
+	credMap  *sync.Map // agent label to credential exchange ID map
 }
 
 func New(name string, adminUrl string, logger log.Logger) *Agent {
@@ -38,11 +40,29 @@ func New(name string, adminUrl string, logger log.Logger) *Agent {
 		client:   &http.Client{},
 		logger:   logger,
 		conns:    &sync.Map{},
+		credMap:  &sync.Map{},
 	}
 }
 
 func (a *Agent) AddConnection(label, connID string) {
 	a.conns.Store(label, connID)
+}
+
+func (a *Agent) AddCredentialRecord(label, credExID string) {
+	//var credIDs []string
+	//val, ok := a.credMap.Load(label)
+	//if ok {
+	//	credIDs, ok = val.([]string)
+	//	if !ok {
+	//		a.logger.Error(fmt.Sprintf(`incompatible credential exchange ID list found for label %s`, label), val)
+	//		return
+	//	}
+	//}
+	//credIDs = append(credIDs, credExID)
+	if a.name != label {
+		a.credMap.Store(label, credExID)
+		a.logger.Debug("credential record saved", label, credExID)
+	}
 }
 
 // CreateInvitation creates an invitation corresponding to out-of-band protocol
@@ -247,6 +267,7 @@ func (a *Agent) CreateSchema(schema []byte) (response []byte, err error) {
 	return data, nil
 }
 
+// CreateCredentialDef forwards the received credential definition body directly to the agent to persist on ledger
 func (a *Agent) CreateCredentialDef(def []byte) (response []byte, err error) {
 	res, err := a.client.Post(a.adminUrl+endpointCredDef, `application/json`, bytes.NewBuffer(def))
 	if err != nil {
@@ -267,6 +288,8 @@ func (a *Agent) CreateCredentialDef(def []byte) (response []byte, err error) {
 	return data, nil
 }
 
+// SendOffer takes domain.CredentialPreview and domain.IndySchemaMeta along with the recipient label which will then be
+// used to send a credential offer to the (to-be) holder
 func (a *Agent) SendOffer(cp domain.CredentialPreview, indySchema domain.IndySchemaMeta, to string) (response []byte, err error) {
 	req := requests.Offer{}
 	val, ok := a.conns.Load(to)
@@ -282,7 +305,7 @@ func (a *Agent) SendOffer(cp domain.CredentialPreview, indySchema domain.IndySch
 	req.ConnectionID = connID
 	req.CredentialPreview = cp
 	req.Filter.Indy = indySchema
-	req.Comment = `credential offer from ` + a.name
+	req.Comment = a.name
 	a.logger.Debug("credential offer constructed", req)
 
 	data, err := json.Marshal(req)
@@ -308,3 +331,102 @@ func (a *Agent) SendOffer(cp domain.CredentialPreview, indySchema domain.IndySch
 	a.logger.Debug(fmt.Sprintf("offer sent to %s", to))
 	return data, nil
 }
+
+// CredentialRecord finds the corresponding credential exchange ID from the in-memory map and fetches the credential record from the ledger
+func (a *Agent) CredentialRecord(label string) (response []byte, err error) {
+	val, ok := a.credMap.Load(label)
+	if !ok {
+		return nil, fmt.Errorf(`no credential offers received by %s`, label)
+	}
+
+	credExID, ok := val.(string)
+	if !ok {
+		return nil, fmt.Errorf(`incompatible credential exchange ID found for label %s [%v]`, label, val)
+	}
+
+	res, err := a.client.Get(a.adminUrl + endpointRecords + credExID)
+	if err != nil {
+		return nil, fmt.Errorf(`transport error - %v`, err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("response error - %d", res.StatusCode)
+	}
+
+	data, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading body - %v", err)
+	}
+
+	a.logger.Debug(fmt.Sprintf("credential record fetched with id %s", credExID))
+	return data, nil
+}
+
+// RequestCredential proceeds with requesting the credential from the issuer which corresponds to the given credential exchange ID
+func (a *Agent) RequestCredential(credExID string) (response []byte, err error) {
+	res, err := a.client.Post(a.adminUrl+endpointRecords+credExID+`/send-request`, `application/json`, nil)
+	if err != nil {
+		return nil, fmt.Errorf(`transport error - %v`, err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("response error - %d", res.StatusCode)
+	}
+
+	data, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading body - %v", err)
+	}
+
+	a.logger.Debug(fmt.Sprintf("requested credential with id %s", credExID))
+	return data, nil
+}
+
+// IssueCredential proceeds with issuing the credential to the holder via connected agent
+func (a *Agent) IssueCredential(credExID string) (response []byte, err error) {
+	body := `{"comment": "issuing credential"}`
+	res, err := a.client.Post(a.adminUrl+endpointRecords+credExID+`/issue`, `application/json`, bytes.NewBuffer([]byte(body)))
+	if err != nil {
+		return nil, fmt.Errorf(`transport error - %v`, err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("response error - %d", res.StatusCode)
+	}
+
+	data, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading body - %v", err)
+	}
+
+	a.logger.Debug(fmt.Sprintf("issued credential with id %s", credExID))
+	return data, nil
+}
+
+// StoreCredential fetches the credential record by the given ID and stores it in the wallet of the holder. If user needs to fetch
+// this stored credential directly from the wallet, id corresponding to `cred_id_stored` parameter of this response should be used.
+func (a *Agent) StoreCredential(credExID string) (response []byte, err error) {
+	res, err := a.client.Post(a.adminUrl+endpointRecords+credExID+`/store`, `application/json`, nil)
+	if err != nil {
+		return nil, fmt.Errorf(`transport error - %v`, err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("response error - %d", res.StatusCode)
+	}
+
+	data, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading body - %v", err)
+	}
+
+	a.logger.Debug(fmt.Sprintf("stored credential with id %s", credExID))
+	return data, nil
+}
+
+func (a *Agent) post()         {}
+func (a *Agent) readResponse() {}

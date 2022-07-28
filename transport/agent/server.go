@@ -32,7 +32,12 @@ func (s *Server) Serve() {
 
 	s.router.HandleFunc(`/schema/create`, s.handleCreateSchema).Methods(http.MethodPost)
 	s.router.HandleFunc(`/credential-definition/create`, s.handleCreateCredentialDef).Methods(http.MethodPost)
+
+	s.router.HandleFunc(`/credential/record/{from}`, s.handleGetCredRecord).Methods(http.MethodGet)
 	s.router.HandleFunc(`/credential/offer/{receiver}`, s.handleSendOffer).Methods(http.MethodPost)
+	s.router.HandleFunc(`/credential/request/{id}`, s.handleRequestCredential).Methods(http.MethodPost)
+	s.router.HandleFunc(`/credential/issue/{id}`, s.handleIssueCredential).Methods(http.MethodPost)
+	s.router.HandleFunc(`/credential/store/{id}`, s.handleStoreCredential).Methods(http.MethodPost)
 
 	s.logger.Info(fmt.Sprintf("controller started listening on %d", s.port))
 	if err := http.ListenAndServe(":"+strconv.Itoa(s.port), s.router); err != nil {
@@ -150,6 +155,12 @@ func (s *Server) handleSendOffer(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
+	//var autoProcess bool
+	//val := r.URL.Query().Get(`auto-process`)
+	//if val == `true` {
+	//	autoProcess = true
+	//}
+
 	var req requests.Offer
 	err = json.Unmarshal(data, &req)
 	if err != nil {
@@ -161,6 +172,54 @@ func (s *Server) handleSendOffer(w http.ResponseWriter, r *http.Request) {
 	res, err := s.agent.SendOffer(req.CredPreview, req.Filter.Indy, receiver)
 	if err != nil {
 		s.logger.Error(fmt.Sprintf(`send offer - %v`, err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	s.writeResponse(res, w)
+}
+
+func (s *Server) handleGetCredRecord(w http.ResponseWriter, r *http.Request) {
+	from := mux.Vars(r)[`from`]
+	res, err := s.agent.CredentialRecord(from)
+	if err != nil {
+		s.logger.Error(fmt.Errorf(`fetch credential record - %v`, err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	s.writeResponse(res, w)
+}
+
+func (s *Server) handleRequestCredential(w http.ResponseWriter, r *http.Request) {
+	credExID := mux.Vars(r)[`id`]
+	res, err := s.agent.RequestCredential(credExID)
+	if err != nil {
+		s.logger.Error(fmt.Errorf(`request credential - %v`, err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	s.writeResponse(res, w)
+}
+
+func (s *Server) handleIssueCredential(w http.ResponseWriter, r *http.Request) {
+	credExID := mux.Vars(r)[`id`]
+	res, err := s.agent.IssueCredential(credExID)
+	if err != nil {
+		s.logger.Error(fmt.Errorf(`issue credential - %v`, err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	s.writeResponse(res, w)
+}
+
+func (s *Server) handleStoreCredential(w http.ResponseWriter, r *http.Request) {
+	credExID := mux.Vars(r)[`id`]
+	res, err := s.agent.StoreCredential(credExID)
+	if err != nil {
+		s.logger.Error(fmt.Errorf(`store credential - %v`, err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
