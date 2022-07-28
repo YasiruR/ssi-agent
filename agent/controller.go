@@ -200,92 +200,22 @@ func (a *Agent) AcceptRequest(label string) (response []byte, err error) {
 		return nil, fmt.Errorf(`connection ID corresponding to the label is not a string`)
 	}
 
-	res, err := a.client.Post(a.adminUrl+endpointConn+connID+`/accept-request`, `application/json`, nil)
-	if err != nil {
-		return nil, fmt.Errorf("transport error - %v", err)
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("response error - %d", res.StatusCode)
-	}
-
-	data, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("reading body - %v", err)
-	}
-
-	a.logger.Debug("connection request accepted", connID)
-	return data, nil
+	return a.post(a.adminUrl+endpointConn+connID+`/accept-request`, nil, fmt.Sprintf("connnection request accepted for id %s", connID))
 }
 
 // Connection fetches connection details for the given ID from agent endpoint and returns the response
 func (a *Agent) Connection(connID string) (response []byte, err error) {
-	res, err := a.client.Get(a.adminUrl + endpointConn + connID)
-	if err != nil {
-		return nil, fmt.Errorf("transport error - %v", err)
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("response error - %d", res.StatusCode)
-	}
-
-	data, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("reading response - %v", err)
-	}
-
-	var conn domain.Connection
-	err = json.Unmarshal(data, &conn)
-	if err != nil {
-		return nil, fmt.Errorf("unmarshal error - %v", err)
-	}
-
-	a.logger.Debug("connection fetched", conn)
-	return data, nil
+	return a.get(a.adminUrl+endpointConn+connID, fmt.Sprintf("connection fetched %s", connID))
 }
 
 // CreateSchema forwards the received schema directly to the agent (needs to be a Trust Anchor)
 func (a *Agent) CreateSchema(schema []byte) (response []byte, err error) {
-	res, err := a.client.Post(a.adminUrl+endpointSchemas, `application/json`, bytes.NewBuffer(schema))
-	if err != nil {
-		return nil, fmt.Errorf(`transport error - %v`, err)
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("response error - %d", res.StatusCode)
-	}
-
-	data, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("reading body - %v", err)
-	}
-
-	a.logger.Debug("schema created")
-	return data, nil
+	return a.post(a.adminUrl+endpointSchemas, schema, "schema created")
 }
 
 // CreateCredentialDef forwards the received credential definition body directly to the agent to persist on ledger
 func (a *Agent) CreateCredentialDef(def []byte) (response []byte, err error) {
-	res, err := a.client.Post(a.adminUrl+endpointCredDef, `application/json`, bytes.NewBuffer(def))
-	if err != nil {
-		return nil, fmt.Errorf(`transport error - %v`, err)
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("response error - %d", res.StatusCode)
-	}
-
-	data, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("reading body - %v", err)
-	}
-
-	a.logger.Debug("credential definition created")
-	return data, nil
+	return a.post(a.adminUrl+endpointCredDef, def, "credential definition created")
 }
 
 // SendOffer takes domain.CredentialPreview and domain.IndySchemaMeta along with the recipient label which will then be
@@ -313,23 +243,7 @@ func (a *Agent) SendOffer(cp domain.CredentialPreview, indySchema domain.IndySch
 		return nil, fmt.Errorf(`marshal error - %v`, err)
 	}
 
-	res, err := a.client.Post(a.adminUrl+endpointSendOffer, `application/json`, bytes.NewBuffer(data))
-	if err != nil {
-		return nil, fmt.Errorf(`transport error - %v`, err)
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("response error - %d", res.StatusCode)
-	}
-
-	data, err = ioutil.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("reading body - %v", err)
-	}
-
-	a.logger.Debug(fmt.Sprintf("offer sent to %s", to))
-	return data, nil
+	return a.post(a.adminUrl+endpointSendOffer, data, fmt.Sprintf("offer sent to %s", to))
 }
 
 // CredentialRecord finds the corresponding credential exchange ID from the in-memory map and fetches the credential record from the ledger
@@ -344,72 +258,29 @@ func (a *Agent) CredentialRecord(label string) (response []byte, err error) {
 		return nil, fmt.Errorf(`incompatible credential exchange ID found for label %s [%v]`, label, val)
 	}
 
-	res, err := a.client.Get(a.adminUrl + endpointRecords + credExID)
-	if err != nil {
-		return nil, fmt.Errorf(`transport error - %v`, err)
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("response error - %d", res.StatusCode)
-	}
-
-	data, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("reading body - %v", err)
-	}
-
-	a.logger.Debug(fmt.Sprintf("credential record fetched with id %s", credExID))
-	return data, nil
+	return a.get(a.adminUrl+endpointRecords+credExID, fmt.Sprintf("credential record fetched with id %s", credExID))
 }
 
 // RequestCredential proceeds with requesting the credential from the issuer which corresponds to the given credential exchange ID
 func (a *Agent) RequestCredential(credExID string) (response []byte, err error) {
-	res, err := a.client.Post(a.adminUrl+endpointRecords+credExID+`/send-request`, `application/json`, nil)
-	if err != nil {
-		return nil, fmt.Errorf(`transport error - %v`, err)
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("response error - %d", res.StatusCode)
-	}
-
-	data, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("reading body - %v", err)
-	}
-
-	a.logger.Debug(fmt.Sprintf("requested credential with id %s", credExID))
-	return data, nil
+	return a.post(a.adminUrl+endpointRecords+credExID+`/send-request`, nil, fmt.Sprintf("requested credential with id %s", credExID))
 }
 
 // IssueCredential proceeds with issuing the credential to the holder via connected agent
 func (a *Agent) IssueCredential(credExID string) (response []byte, err error) {
 	body := `{"comment": "issuing credential"}`
-	res, err := a.client.Post(a.adminUrl+endpointRecords+credExID+`/issue`, `application/json`, bytes.NewBuffer([]byte(body)))
-	if err != nil {
-		return nil, fmt.Errorf(`transport error - %v`, err)
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("response error - %d", res.StatusCode)
-	}
-
-	data, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return nil, fmt.Errorf("reading body - %v", err)
-	}
-
-	a.logger.Debug(fmt.Sprintf("issued credential with id %s", credExID))
-	return data, nil
+	return a.post(a.adminUrl+endpointRecords+credExID+`/issue`, []byte(body), fmt.Sprintf("issued credential with id %s", credExID))
 }
 
 // StoreCredential fetches the credential record by the given ID and stores it in the wallet of the holder. If user needs to fetch
 // this stored credential directly from the wallet, id corresponding to `cred_id_stored` parameter of this response should be used.
 func (a *Agent) StoreCredential(credExID string) (response []byte, err error) {
-	res, err := a.client.Post(a.adminUrl+endpointRecords+credExID+`/store`, `application/json`, nil)
+	return a.post(a.adminUrl+endpointRecords+credExID+`/store`, nil, fmt.Sprintf("stored credential with id %s", credExID))
+}
+
+// post proceeds with sending POST request
+func (a *Agent) post(url string, body []byte, successLog string) (response []byte, err error) {
+	res, err := a.client.Post(url, `application/json`, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, fmt.Errorf(`transport error - %v`, err)
 	}
@@ -424,9 +295,27 @@ func (a *Agent) StoreCredential(credExID string) (response []byte, err error) {
 		return nil, fmt.Errorf("reading body - %v", err)
 	}
 
-	a.logger.Debug(fmt.Sprintf("stored credential with id %s", credExID))
+	a.logger.Debug(successLog)
 	return data, nil
 }
 
-func (a *Agent) post()         {}
-func (a *Agent) readResponse() {}
+// get proceeds with sending GET request
+func (a *Agent) get(url string, successLog string) (response []byte, err error) {
+	res, err := a.client.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf(`transport error - %v`, err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("response error - %d", res.StatusCode)
+	}
+
+	data, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("reading body - %v", err)
+	}
+
+	a.logger.Debug(successLog)
+	return data, nil
+}
