@@ -11,13 +11,18 @@ Technologies) depending on the use-case.
 
 ### DID-Exchange
 
-![sequence diagram](docs/images/did-exchange.png)
+![sequence diagram_did](docs/images/did-exchange.png)
 * acknowledgments and insignificant webhooks are neglected
 
-### Schemas
+### Schema
 
+![sequence diagram_schema](docs/images/schema.png)
 
+### Credential Definition
 
-### Credential Definitions
+For each schema, a credential definition should be published with public keys for each 
+attribute such that a verifier can verify at the attribute level.
+
+![sequence diagram_cred_def](docs/images/cred-def.png)
 
 ### Issue Credential
