@@ -26,3 +26,8 @@ attribute such that a verifier can verify at the attribute level.
 ![sequence diagram_cred_def](docs/images/cred-def.png)
 
 ### Issue Credential
+
+![sequence diagram_issue_credential](docs/images/issue-credential.png)
+* acknowledgments and insignificant webhooks are neglected
+* credential exchange IDs in two agents are different and unique
+* procedure starts from issuer sending an offer to holder
