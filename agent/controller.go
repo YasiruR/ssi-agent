@@ -21,6 +21,7 @@ const (
 	endpointSchemas   = `/schemas`
 	endpointCredDef   = `/credential-definitions`
 	endpointSendOffer = `/issue-credential-2.0/send-offer`
+	endpointSend      = `/issue-credential-2.0/send`
 	endpointRecords   = `/issue-credential-2.0/records/`
 )
 
@@ -48,17 +49,21 @@ func (a *Agent) AddConnection(label, connID string) {
 	a.conns.Store(label, connID)
 }
 
+func (a *Agent) GetConnectionByLabel(label string) (string, error) {
+	val, ok := a.conns.Load(label)
+	if !ok {
+		return ``, fmt.Errorf(`no connection found for the recipient %s`, label)
+	}
+
+	connID, ok := val.(string)
+	if !ok {
+		return ``, fmt.Errorf(`connection ID corresponding to the recipient is not a string`)
+	}
+
+	return connID, nil
+}
+
 func (a *Agent) AddCredentialRecord(label, credExID string) {
-	//var credIDs []string
-	//val, ok := a.credMap.Load(label)
-	//if ok {
-	//	credIDs, ok = val.([]string)
-	//	if !ok {
-	//		a.logger.Error(fmt.Sprintf(`incompatible credential exchange ID list found for label %s`, label), val)
-	//		return
-	//	}
-	//}
-	//credIDs = append(credIDs, credExID)
 	if a.name != label {
 		a.credMap.Store(label, credExID)
 		a.logger.Debug("credential record saved", label, credExID)
@@ -219,23 +224,17 @@ func (a *Agent) CreateCredentialDef(def []byte) (response []byte, err error) {
 }
 
 // SendOffer takes domain.CredentialPreview and domain.IndySchemaMeta along with the recipient label which will then be
-// used to send a credential offer to the (to-be) holder
+// used to send a credential offer to the (to-be) holder. Setting auto_remove of offer to true removes credential exchange
+// record automatically after the protocol completes.
 func (a *Agent) SendOffer(cp domain.CredentialPreview, indySchema domain.IndySchemaMeta, to string) (response []byte, err error) {
 	req := requests.Offer{}
-	val, ok := a.conns.Load(to)
-	if !ok {
-		return nil, fmt.Errorf(`no connection found for the recipient %s`, to)
-	}
-
-	connID, ok := val.(string)
-	if !ok {
-		return nil, fmt.Errorf(`connection ID corresponding to the recipient is not a string`)
-	}
-
-	req.ConnectionID = connID
 	req.CredentialPreview = cp
 	req.Filter.Indy = indySchema
 	req.Comment = a.name
+	req.ConnectionID, err = a.GetConnectionByLabel(to)
+	if err != nil {
+		return nil, fmt.Errorf(`get connection by label - %v`, err)
+	}
 	a.logger.Debug("credential offer constructed", req)
 
 	data, err := json.Marshal(req)
@@ -276,6 +275,26 @@ func (a *Agent) IssueCredential(credExID string) (response []byte, err error) {
 // this stored credential directly from the wallet, id corresponding to `cred_id_stored` parameter of this response should be used.
 func (a *Agent) StoreCredential(credExID string) (response []byte, err error) {
 	return a.post(a.adminUrl+endpointRecords+credExID+`/store`, nil, fmt.Sprintf("stored credential with id %s", credExID))
+}
+
+// SendCredential starts from sending an offer for a credential and follows an automated process for the rest of the steps
+func (a *Agent) SendCredential(cp domain.CredentialPreview, indySchema domain.IndySchemaMeta, to string) (response []byte, err error) {
+	req := requests.Offer{}
+	req.CredentialPreview = cp
+	req.Filter.Indy = indySchema
+	req.Comment = a.name
+	req.ConnectionID, err = a.GetConnectionByLabel(to)
+	if err != nil {
+		return nil, fmt.Errorf(`get connection by label - %v`, err)
+	}
+	a.logger.Debug("credential offer constructed for automated process", req)
+
+	data, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf(`marshal error - %v`, err)
+	}
+
+	return a.post(a.adminUrl+endpointSend, data, fmt.Sprintf("automated process started by sending offer to %s", to))
 }
 
 // post proceeds with sending POST request

@@ -155,17 +155,22 @@ func (s *Server) handleSendOffer(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	//var autoProcess bool
-	//val := r.URL.Query().Get(`auto-process`)
-	//if val == `true` {
-	//	autoProcess = true
-	//}
-
 	var req requests.Offer
 	err = json.Unmarshal(data, &req)
 	if err != nil {
 		s.logger.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	if req.AutoProcess == true {
+		res, err := s.agent.SendCredential(req.CredPreview, req.Filter.Indy, receiver)
+		if err != nil {
+			s.logger.Error(fmt.Sprintf(`send offer - %v`, err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		s.writeResponse(res, w)
 		return
 	}
 
