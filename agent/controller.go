@@ -195,14 +195,9 @@ func (a *Agent) acceptInvitation(connID string) (response []byte, err error) {
 
 // AcceptRequest maps the label to connection ID received by webhook and proceeds with accepting connection request via agent
 func (a *Agent) AcceptRequest(label string) (response []byte, err error) {
-	val, ok := a.conns.Load(label)
-	if !ok {
-		return nil, fmt.Errorf(`no connection found for the label`)
-	}
-
-	connID, ok := val.(string)
-	if !ok {
-		return nil, fmt.Errorf(`connection ID corresponding to the label is not a string`)
+	connID, err := a.GetConnectionByLabel(label)
+	if err != nil {
+		return nil, fmt.Errorf(`get connection by label - %v`, err)
 	}
 
 	return a.post(a.adminUrl+endpointConn+connID+`/accept-request`, nil, fmt.Sprintf("connnection request accepted for id %s", connID))
