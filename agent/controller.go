@@ -15,14 +15,15 @@ import (
 
 // agent endpoints
 const (
-	endpointCreateInv = `/connections/create-invitation`
-	endpointAcceptInv = `/connections/receive-invitation`
-	endpointConn      = `/connections/`
-	endpointSchemas   = `/schemas`
-	endpointCredDef   = `/credential-definitions`
-	endpointSendOffer = `/issue-credential-2.0/send-offer`
-	endpointSend      = `/issue-credential-2.0/send`
-	endpointRecords   = `/issue-credential-2.0/records/`
+	endpointCreateInv    = `/connections/create-invitation`
+	endpointAcceptInv    = `/connections/receive-invitation`
+	endpointConn         = `/connections/`
+	endpointSchemas      = `/schemas`
+	endpointCredDef      = `/credential-definitions`
+	endpointSendOffer    = `/issue-credential-2.0/send-offer`
+	endpointSendCredAuto = `/issue-credential-2.0/send`
+	endpointRecords      = `/issue-credential-2.0/records/`
+	endpointSendProofReq = `/present-proof-2.0/send-request`
 )
 
 type Agent struct {
@@ -218,10 +219,10 @@ func (a *Agent) CreateCredentialDef(def []byte) (response []byte, err error) {
 	return a.post(a.adminUrl+endpointCredDef, def, "credential definition created")
 }
 
-// SendOffer takes domain.CredentialPreview and domain.IndySchemaMeta along with the recipient label which will then be
+// SendCredentialOffer takes domain.CredentialPreview and domain.IndySchemaMeta along with the recipient label which will then be
 // used to send a credential offer to the (to-be) holder. Setting auto_remove of offer to true removes credential exchange
 // record automatically after the protocol completes.
-func (a *Agent) SendOffer(cp domain.CredentialPreview, indySchema domain.IndySchemaMeta, to string) (response []byte, err error) {
+func (a *Agent) SendCredentialOffer(cp domain.CredentialPreview, indySchema domain.IndySchemaMeta, to string) (response []byte, err error) {
 	req := requests.Offer{}
 	req.CredentialPreview = cp
 	req.Filter.Indy = indySchema
@@ -272,8 +273,9 @@ func (a *Agent) StoreCredential(credExID string) (response []byte, err error) {
 	return a.post(a.adminUrl+endpointRecords+credExID+`/store`, nil, fmt.Sprintf("stored credential with id %s", credExID))
 }
 
-// SendCredential starts from sending an offer for a credential and follows an automated process for the rest of the steps
-func (a *Agent) SendCredential(cp domain.CredentialPreview, indySchema domain.IndySchemaMeta, to string) (response []byte, err error) {
+// SendCredentialAuto starts from sending an offer for a credential and follows an automated process for the rest of the steps.
+// This needs the holder to enable auto-responsiveness to credential offers.
+func (a *Agent) SendCredentialAuto(cp domain.CredentialPreview, indySchema domain.IndySchemaMeta, to string) (response []byte, err error) {
 	req := requests.Offer{}
 	req.CredentialPreview = cp
 	req.Filter.Indy = indySchema
@@ -289,7 +291,24 @@ func (a *Agent) SendCredential(cp domain.CredentialPreview, indySchema domain.In
 		return nil, fmt.Errorf(`marshal error - %v`, err)
 	}
 
-	return a.post(a.adminUrl+endpointSend, data, fmt.Sprintf("automated process started by sending offer to %s", to))
+	return a.post(a.adminUrl+endpointSendCredAuto, data, fmt.Sprintf("automated process started by sending offer to %s", to))
+}
+
+func (a *Agent) SendProofRequest(pr domain.PresentationRequest, to string) (response []byte, err error) {
+	connID, err := a.GetConnectionByLabel(to)
+	if err != nil {
+		return nil, fmt.Errorf(`get connection by label - %v`, err)
+	}
+
+	req := requests.ProofRequest{Comment: a.name, ConnectionID: connID, PresentReq: pr}
+
+	// todo generalize
+	data, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf(`marshal error - %v`, err)
+	}
+
+	return a.post(a.adminUrl+endpointSendProofReq, data, fmt.Sprintf(`proof request sent to %s`, to))
 }
 
 // post proceeds with sending POST request
