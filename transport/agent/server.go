@@ -252,7 +252,7 @@ func (s *Server) handleSendProofReq(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res, err := s.agent.SendProofRequest(req.PresentReq, receiver)
+	res, err := s.agent.PresentProof(req.PresentReq, receiver)
 	if err != nil {
 		s.logger.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)

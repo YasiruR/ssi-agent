@@ -22,8 +22,10 @@ const (
 	endpointCredDef      = `/credential-definitions`
 	endpointSendOffer    = `/issue-credential-2.0/send-offer`
 	endpointSendCredAuto = `/issue-credential-2.0/send`
-	endpointRecords      = `/issue-credential-2.0/records/`
+	endpointCredRecords  = `/issue-credential-2.0/records/`
 	endpointSendProofReq = `/present-proof-2.0/send-request`
+	endpointProofRecords = `/present-proof-2.0/records/`
+	endpointCredentials  = `/credentials`
 )
 
 type Agent struct {
@@ -31,8 +33,9 @@ type Agent struct {
 	adminUrl string
 	client   *http.Client
 	logger   log.Logger
-	conns    *sync.Map // peer label to own connection ID map
-	credMap  *sync.Map // agent label to credential exchange ID map
+	connMap  *sync.Map // peer agent label to own connection ID map
+	credMap  *sync.Map // peer agent label to credential exchange ID map
+	proofMap *sync.Map // peer agent label to proof exchange ID map
 }
 
 func New(name string, adminUrl string, logger log.Logger) *Agent {
@@ -41,17 +44,18 @@ func New(name string, adminUrl string, logger log.Logger) *Agent {
 		adminUrl: adminUrl,
 		client:   &http.Client{},
 		logger:   logger,
-		conns:    &sync.Map{},
+		connMap:  &sync.Map{},
 		credMap:  &sync.Map{},
+		proofMap: &sync.Map{},
 	}
 }
 
 func (a *Agent) AddConnection(label, connID string) {
-	a.conns.Store(label, connID)
+	a.connMap.Store(label, connID)
 }
 
 func (a *Agent) GetConnectionByLabel(label string) (string, error) {
-	val, ok := a.conns.Load(label)
+	val, ok := a.connMap.Load(label)
 	if !ok {
 		return ``, fmt.Errorf(`no connection found for the recipient %s`, label)
 	}
@@ -68,6 +72,13 @@ func (a *Agent) AddCredentialRecord(label, credExID string) {
 	if a.name != label {
 		a.credMap.Store(label, credExID)
 		a.logger.Debug("credential record saved", label, credExID)
+	}
+}
+
+func (a *Agent) AddPresentationRecord(label, presExID string) {
+	if a.name != label {
+		a.credMap.Store(label, presExID)
+		a.logger.Debug("proof record saved", label, presExID)
 	}
 }
 
@@ -253,24 +264,24 @@ func (a *Agent) CredentialRecord(label string) (response []byte, err error) {
 		return nil, fmt.Errorf(`incompatible credential exchange ID found for label %s [%v]`, label, val)
 	}
 
-	return a.get(a.adminUrl+endpointRecords+credExID, fmt.Sprintf("credential record fetched with id %s", credExID))
+	return a.get(a.adminUrl+endpointCredRecords+credExID, fmt.Sprintf("credential record fetched with id %s", credExID))
 }
 
 // RequestCredential proceeds with requesting the credential from the issuer which corresponds to the given credential exchange ID
 func (a *Agent) RequestCredential(credExID string) (response []byte, err error) {
-	return a.post(a.adminUrl+endpointRecords+credExID+`/send-request`, nil, fmt.Sprintf("requested credential with id %s", credExID))
+	return a.post(a.adminUrl+endpointCredRecords+credExID+`/send-request`, nil, fmt.Sprintf("requested credential with id %s", credExID))
 }
 
 // IssueCredential proceeds with issuing the credential to the holder via connected agent
 func (a *Agent) IssueCredential(credExID string) (response []byte, err error) {
 	body := `{"comment": "issuing credential"}`
-	return a.post(a.adminUrl+endpointRecords+credExID+`/issue`, []byte(body), fmt.Sprintf("issued credential with id %s", credExID))
+	return a.post(a.adminUrl+endpointCredRecords+credExID+`/issue`, []byte(body), fmt.Sprintf("issued credential with id %s", credExID))
 }
 
 // StoreCredential fetches the credential record by the given ID and stores it in the wallet of the holder. If user needs to fetch
 // this stored credential directly from the wallet, id corresponding to `cred_id_stored` parameter of this response should be used.
 func (a *Agent) StoreCredential(credExID string) (response []byte, err error) {
-	return a.post(a.adminUrl+endpointRecords+credExID+`/store`, nil, fmt.Sprintf("stored credential with id %s", credExID))
+	return a.post(a.adminUrl+endpointCredRecords+credExID+`/store`, nil, fmt.Sprintf("stored credential with id %s", credExID))
 }
 
 // SendCredentialAuto starts from sending an offer for a credential and follows an automated process for the rest of the steps.
@@ -294,21 +305,98 @@ func (a *Agent) SendCredentialAuto(cp domain.CredentialPreview, indySchema domai
 	return a.post(a.adminUrl+endpointSendCredAuto, data, fmt.Sprintf("automated process started by sending offer to %s", to))
 }
 
-func (a *Agent) SendProofRequest(pr domain.PresentationRequest, to string) (response []byte, err error) {
-	connID, err := a.GetConnectionByLabel(to)
+// only requested attributes atm
+func (a *Agent) PresentProof(pr domain.PresentationRequest, from string) (response []byte, err error) {
+	presExID, err := a.sendProofRequest(pr, from)
 	if err != nil {
-		return nil, fmt.Errorf(`get connection by label - %v`, err)
+		return nil, fmt.Errorf(`send proof request to agent component failed - %v`, err)
 	}
 
-	req := requests.ProofRequest{Comment: a.name, ConnectionID: connID, PresentReq: pr}
+	creds, err := a.getCredentialsFromWallet()
+	if err != nil {
+		return nil, fmt.Errorf(`get credentials failed - %v`, err)
+	}
 
+	proof := a.constructProof(pr.Indy.RequestedAttributes, creds)
+
+	return a.sendProofPresentation(presExID, proof)
+}
+
+func (a *Agent) sendProofRequest(pr domain.PresentationRequest, from string) (presExID string, err error) {
+	connID, err := a.GetConnectionByLabel(from)
+	if err != nil {
+		return ``, fmt.Errorf(`get connection by label - %v`, err)
+	}
+
+	req := requests.ProofRequest{Comment: from, ConnectionID: connID, PresentReq: pr}
 	// todo generalize
 	data, err := json.Marshal(req)
 	if err != nil {
-		return nil, fmt.Errorf(`marshal error - %v`, err)
+		return ``, fmt.Errorf(`marshal error - %v`, err)
 	}
 
-	return a.post(a.adminUrl+endpointSendProofReq, data, fmt.Sprintf(`proof request sent to %s`, to))
+	data, err = a.post(a.adminUrl+endpointSendProofReq, data, fmt.Sprintf(`proof request received by %s`, from))
+	if err != nil {
+		return ``, fmt.Errorf(`sending post request - %v`, err)
+	}
+
+	var res responses.PresentationProof
+	err = json.Unmarshal(data, &res)
+	if err != nil {
+		return ``, fmt.Errorf(`unmarshal error - %v`, err)
+	}
+
+	return res.PresExID, nil
+}
+
+func (a *Agent) constructProof(reqAttributes map[string]domain.Attribute, creds []responses.WalletCredential) requests.ProofPresentation {
+	var proof requests.ProofPresentation
+	proof.Indy.RequestedAttributes = make(map[string]requests.AdditionalProp)
+	proof.Indy.RequestedPredicates = make(map[string]requests.AdditionalProp)
+	proof.Indy.SelfAttestedAttributes = make(map[string]string)
+attrLoop:
+	for reqAttrKey, reqAttr := range reqAttributes {
+		for _, cred := range creds {
+			for credAttrName, _ := range cred.Attrs {
+				// check if stored attribute name and cred def ID are same as the requested
+				if reqAttr.Name == credAttrName {
+					for _, restrict := range reqAttr.Restrictions {
+						if restrict.CredDefID == cred.CredDefID {
+							proof.Indy.RequestedAttributes[reqAttrKey] = requests.AdditionalProp{CredID: cred.Referent, Revealed: true}
+							continue attrLoop
+						}
+					}
+				}
+			}
+		}
+	}
+
+	a.logger.Debug(`presentation proof constructed`, proof)
+	return proof
+}
+
+func (a *Agent) sendProofPresentation(presExID string, proofPres requests.ProofPresentation) (response []byte, err error) {
+	data, err := json.Marshal(proofPres)
+	if err != nil {
+		return nil, fmt.Errorf(`marhsal error - %v`, err)
+	}
+
+	return a.post(a.adminUrl+endpointProofRecords+presExID+`/send-presentation`, data, fmt.Sprintf(`presentation sent with exchange id %s`, presExID))
+}
+
+func (a *Agent) getCredentialsFromWallet() ([]responses.WalletCredential, error) {
+	data, err := a.get(a.adminUrl+endpointCredentials, fmt.Sprintf(`fetched credentials from the wallet of %s`, a.name))
+	if err != nil {
+		return nil, err
+	}
+
+	var res responses.Credentials
+	err = json.Unmarshal(data, &res)
+	if err != nil {
+		return nil, fmt.Errorf(`unmarshal error - %v`, err)
+	}
+
+	return res.Results, nil
 }
 
 // post proceeds with sending POST request
