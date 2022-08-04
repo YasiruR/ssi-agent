@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/YasiruR/agent/agent/models"
 	"github.com/YasiruR/agent/agent/requests"
 	"github.com/YasiruR/agent/agent/responses"
 	"github.com/YasiruR/agent/domain"
@@ -75,11 +76,25 @@ func (a *Agent) AddCredentialRecord(label, credExID string) {
 	}
 }
 
-func (a *Agent) AddPresentationRecord(label, presExID string) {
+func (a *Agent) AddPresentationRecord(label, presExID string, pr domain.PresentationRequest) {
 	if a.name != label {
-		a.credMap.Store(label, presExID)
+		a.proofMap.Store(label, models.ProofPresentation{PresExID: presExID, PresReq: pr})
 		a.logger.Debug("proof record saved", label, presExID)
 	}
+}
+
+func (a *Agent) GetPresentationRecord(label string) (models.ProofPresentation, error) {
+	val, ok := a.proofMap.Load(label)
+	if !ok {
+		return models.ProofPresentation{}, fmt.Errorf(`presentation record does not exist for label %s`, label)
+	}
+
+	pp, ok := val.(models.ProofPresentation)
+	if !ok {
+		return models.ProofPresentation{}, fmt.Errorf(`incompatible proof record found for label %s [%v]`, label, val)
+	}
+
+	return pp, nil
 }
 
 // CreateInvitation creates an invitation corresponding to out-of-band protocol
@@ -305,48 +320,36 @@ func (a *Agent) SendCredentialAuto(cp domain.CredentialPreview, indySchema domai
 	return a.post(a.adminUrl+endpointSendCredAuto, data, fmt.Sprintf("automated process started by sending offer to %s", to))
 }
 
-// only requested attributes atm
-func (a *Agent) PresentProof(pr domain.PresentationRequest, from string) (response []byte, err error) {
-	presExID, err := a.sendProofRequest(pr, from)
+func (a *Agent) SendProofRequest(pr domain.PresentationRequest, to string) (response []byte, err error) {
+	connID, err := a.GetConnectionByLabel(to)
 	if err != nil {
-		return nil, fmt.Errorf(`send proof request to agent component failed - %v`, err)
+		return nil, fmt.Errorf(`get connection by label - %v`, err)
 	}
 
+	req := requests.ProofRequest{Comment: a.name, ConnectionID: connID, PresentReq: pr}
+	// todo generalize
+	data, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf(`marshal error - %v`, err)
+	}
+
+	return a.post(a.adminUrl+endpointSendProofReq, data, fmt.Sprintf(`proof request received by %s`, to))
+}
+
+func (a *Agent) PresentProof(to string) (response []byte, err error) {
+	// todo only requested attributes atm
 	creds, err := a.getCredentialsFromWallet()
 	if err != nil {
 		return nil, fmt.Errorf(`get credentials failed - %v`, err)
 	}
 
-	proof := a.constructProof(pr.Indy.RequestedAttributes, creds)
-
-	return a.sendProofPresentation(presExID, proof)
-}
-
-func (a *Agent) sendProofRequest(pr domain.PresentationRequest, from string) (presExID string, err error) {
-	connID, err := a.GetConnectionByLabel(from)
+	pp, err := a.GetPresentationRecord(to)
 	if err != nil {
-		return ``, fmt.Errorf(`get connection by label - %v`, err)
+		return nil, fmt.Errorf(`get record failed - %v`, err)
 	}
+	proof := a.constructProof(pp.PresReq.Indy.RequestedAttributes, creds)
 
-	req := requests.ProofRequest{Comment: from, ConnectionID: connID, PresentReq: pr}
-	// todo generalize
-	data, err := json.Marshal(req)
-	if err != nil {
-		return ``, fmt.Errorf(`marshal error - %v`, err)
-	}
-
-	data, err = a.post(a.adminUrl+endpointSendProofReq, data, fmt.Sprintf(`proof request received by %s`, from))
-	if err != nil {
-		return ``, fmt.Errorf(`sending post request - %v`, err)
-	}
-
-	var res responses.PresentationProof
-	err = json.Unmarshal(data, &res)
-	if err != nil {
-		return ``, fmt.Errorf(`unmarshal error - %v`, err)
-	}
-
-	return res.PresExID, nil
+	return a.sendProofPresentation(pp.PresExID, proof)
 }
 
 func (a *Agent) constructProof(reqAttributes map[string]domain.Attribute, creds []responses.WalletCredential) requests.ProofPresentation {

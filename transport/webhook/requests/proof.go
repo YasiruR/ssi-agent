@@ -5,15 +5,7 @@ import "github.com/YasiruR/agent/domain"
 type PresentationProof struct {
 	AutoPresent bool `json:"auto_present"`
 	ByFormat    struct {
-		PresRequest struct {
-			Indy struct {
-				Name                string                      `json:"name"`
-				Nonce               string                      `json:"nonce"`
-				RequestedAttributes map[string]domain.Attribute `json:"requested_attributes"`
-				RequestedPredicates map[string]domain.Predicate `json:"requested_predicates"`
-				Version             string                      `json:"version"`
-			} `json:"indy"`
-		} `json:"pres_request"`
+		PresRequest domain.PresentationRequest `json:"pres_request"`
 	} `json:"by_format"`
 	ConnectionID string `json:"connection_id"`
 	CreatedAt    string `json:"created_at"`

@@ -107,5 +107,5 @@ func (s *Server) handlePresentProof(_ http.ResponseWriter, r *http.Request) {
 	}
 
 	s.logger.Debug("webhook received for proof presentation", req)
-	s.agent.AddPresentationRecord(req.PresRequest.Comment, req.PresExID)
+	s.agent.AddPresentationRecord(req.PresRequest.Comment, req.PresExID, req.ByFormat.PresRequest)
 }

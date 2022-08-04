@@ -40,6 +40,7 @@ func (s *Server) Serve() {
 	s.router.HandleFunc(`/credential/store/{id}`, s.handleStoreCredential).Methods(http.MethodPost)
 
 	s.router.HandleFunc(`/proof/request/{receiver}`, s.handleSendProofReq).Methods(http.MethodPost)
+	s.router.HandleFunc(`/proof/present/{receiver}`, s.handlePresentProof).Methods(http.MethodPost)
 
 	s.logger.Info(fmt.Sprintf("controller started listening on %d", s.port))
 	if err := http.ListenAndServe(":"+strconv.Itoa(s.port), s.router); err != nil {
@@ -252,7 +253,19 @@ func (s *Server) handleSendProofReq(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res, err := s.agent.PresentProof(req.PresentReq, receiver)
+	res, err := s.agent.SendProofRequest(req.PresentReq, receiver)
+	if err != nil {
+		s.logger.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	s.writeResponse(res, w)
+}
+
+func (s *Server) handlePresentProof(w http.ResponseWriter, r *http.Request) {
+	receiver := mux.Vars(r)[`receiver`]
+	res, err := s.agent.PresentProof(receiver)
 	if err != nil {
 		s.logger.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
