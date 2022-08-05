@@ -41,6 +41,7 @@ func (s *Server) Serve() {
 
 	s.router.HandleFunc(`/proof/request/{receiver}`, s.handleSendProofReq).Methods(http.MethodPost)
 	s.router.HandleFunc(`/proof/present/{receiver}`, s.handlePresentProof).Methods(http.MethodPost)
+	s.router.HandleFunc(`/proof/verify/{id}`, s.handleVerifyProof).Methods(http.MethodPost)
 
 	s.logger.Info(fmt.Sprintf("controller started listening on %d", s.port))
 	if err := http.ListenAndServe(":"+strconv.Itoa(s.port), s.router); err != nil {
@@ -266,6 +267,18 @@ func (s *Server) handleSendProofReq(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handlePresentProof(w http.ResponseWriter, r *http.Request) {
 	receiver := mux.Vars(r)[`receiver`]
 	res, err := s.agent.PresentProof(receiver)
+	if err != nil {
+		s.logger.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	s.writeResponse(res, w)
+}
+
+func (s *Server) handleVerifyProof(w http.ResponseWriter, r *http.Request) {
+	presExID := mux.Vars(r)[`id`]
+	res, err := s.agent.VerifyProof(presExID)
 	if err != nil {
 		s.logger.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)

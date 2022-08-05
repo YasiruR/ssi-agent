@@ -402,6 +402,10 @@ func (a *Agent) getCredentialsFromWallet() ([]responses.WalletCredential, error)
 	return res.Results, nil
 }
 
+func (a *Agent) VerifyProof(presExID string) (response []byte, err error) {
+	return a.post(a.adminUrl+endpointProofRecords+presExID+`/verify-presentation`, nil, fmt.Sprintf(`verified presentation proof %s`, presExID))
+}
+
 // post proceeds with sending POST request
 func (a *Agent) post(url string, body []byte, successLog string) (response []byte, err error) {
 	res, err := a.client.Post(url, `application/json`, bytes.NewBuffer(body))
