@@ -12,6 +12,3 @@ type CreateInvitation struct {
 	MyLabel            string   `json:"my_label"`
 	UsePublicDid       bool     `json:"use_public_did"`
 }
-
-type AcceptInvitation struct {
-}

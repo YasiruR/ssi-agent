@@ -39,6 +39,10 @@ func (s *Server) Serve() {
 	s.router.HandleFunc(`/credential/issue/{id}`, s.handleIssueCredential).Methods(http.MethodPost)
 	s.router.HandleFunc(`/credential/store/{id}`, s.handleStoreCredential).Methods(http.MethodPost)
 
+	s.router.HandleFunc(`/proof/request/{receiver}`, s.handleSendProofReq).Methods(http.MethodPost)
+	s.router.HandleFunc(`/proof/present/{receiver}`, s.handlePresentProof).Methods(http.MethodPost)
+	s.router.HandleFunc(`/proof/verify/{id}`, s.handleVerifyProof).Methods(http.MethodPost)
+
 	s.logger.Info(fmt.Sprintf("controller started listening on %d", s.port))
 	if err := http.ListenAndServe(":"+strconv.Itoa(s.port), s.router); err != nil {
 		s.logger.Fatal(err)
@@ -155,12 +159,6 @@ func (s *Server) handleSendOffer(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	//var autoProcess bool
-	//val := r.URL.Query().Get(`auto-process`)
-	//if val == `true` {
-	//	autoProcess = true
-	//}
-
 	var req requests.Offer
 	err = json.Unmarshal(data, &req)
 	if err != nil {
@@ -169,7 +167,18 @@ func (s *Server) handleSendOffer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res, err := s.agent.SendOffer(req.CredPreview, req.Filter.Indy, receiver)
+	if req.AutoProcess == true {
+		res, err := s.agent.SendCredentialAuto(req.CredPreview, req.Filter.Indy, receiver)
+		if err != nil {
+			s.logger.Error(fmt.Sprintf(`send offer - %v`, err))
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		s.writeResponse(res, w)
+		return
+	}
+
+	res, err := s.agent.SendCredentialOffer(req.CredPreview, req.Filter.Indy, receiver)
 	if err != nil {
 		s.logger.Error(fmt.Sprintf(`send offer - %v`, err))
 		w.WriteHeader(http.StatusInternalServerError)
@@ -220,6 +229,58 @@ func (s *Server) handleStoreCredential(w http.ResponseWriter, r *http.Request) {
 	res, err := s.agent.StoreCredential(credExID)
 	if err != nil {
 		s.logger.Error(fmt.Errorf(`store credential - %v`, err))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	s.writeResponse(res, w)
+}
+
+func (s *Server) handleSendProofReq(w http.ResponseWriter, r *http.Request) {
+	receiver := mux.Vars(r)[`receiver`]
+	data, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		s.logger.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	defer r.Body.Close()
+
+	var req requests.ProofReq
+	err = json.Unmarshal(data, &req)
+	if err != nil {
+		s.logger.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	res, err := s.agent.SendProofRequest(req.PresentReq, receiver)
+	if err != nil {
+		s.logger.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	s.writeResponse(res, w)
+}
+
+func (s *Server) handlePresentProof(w http.ResponseWriter, r *http.Request) {
+	receiver := mux.Vars(r)[`receiver`]
+	res, err := s.agent.PresentProof(receiver)
+	if err != nil {
+		s.logger.Error(err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	s.writeResponse(res, w)
+}
+
+func (s *Server) handleVerifyProof(w http.ResponseWriter, r *http.Request) {
+	presExID := mux.Vars(r)[`id`]
+	res, err := s.agent.VerifyProof(presExID)
+	if err != nil {
+		s.logger.Error(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}

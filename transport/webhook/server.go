@@ -27,6 +27,7 @@ func (s *Server) Serve() {
 	s.router.HandleFunc(`/topic/connections/`, s.handleConnections).Methods(http.MethodPost)
 	s.router.HandleFunc(`/topic/issue_credential_v2_0/`, s.handleCredentials).Methods(http.MethodPost)
 	s.router.HandleFunc(`/topic/issue_credential_v2_0_indy/`, s.handleIndyCredentials).Methods(http.MethodPost)
+	s.router.HandleFunc(`/topic/present_proof_v2_0/`, s.handlePresentProof).Methods(http.MethodPost)
 
 	s.logger.Info(fmt.Sprintf("webhook server started listening on %d", s.port))
 	if err := http.ListenAndServe(":"+strconv.Itoa(s.port), s.router); err != nil {
@@ -89,4 +90,22 @@ func (s *Server) handleIndyCredentials(_ http.ResponseWriter, r *http.Request) {
 	}
 
 	s.logger.Debug("webhook received for credentials for indy", req)
+}
+
+func (s *Server) handlePresentProof(_ http.ResponseWriter, r *http.Request) {
+	data, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		s.logger.Error(err)
+		return
+	}
+
+	var req requests.PresentationProof
+	err = json.Unmarshal(data, &req)
+	if err != nil {
+		s.logger.Error(err)
+		return
+	}
+
+	s.logger.Debug("webhook received for proof presentation", req)
+	s.agent.AddPresentationRecord(req.PresRequest.Comment, req.PresExID, req.ByFormat.PresRequest)
 }
