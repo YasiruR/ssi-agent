@@ -320,6 +320,7 @@ func (a *Agent) SendCredentialAuto(cp domain.CredentialPreview, indySchema domai
 	return a.post(a.adminUrl+endpointSendCredAuto, data, fmt.Sprintf("automated process started by sending offer to %s", to))
 }
 
+// SendProofRequest finds the corresponding connection ID of the peer agent label and sends a proof request with the given body
 func (a *Agent) SendProofRequest(pr domain.PresentationRequest, to string) (response []byte, err error) {
 	connID, err := a.GetConnectionByLabel(to)
 	if err != nil {
@@ -327,7 +328,6 @@ func (a *Agent) SendProofRequest(pr domain.PresentationRequest, to string) (resp
 	}
 
 	req := requests.ProofRequest{Comment: a.name, ConnectionID: connID, PresentReq: pr}
-	// todo generalize
 	data, err := json.Marshal(req)
 	if err != nil {
 		return nil, fmt.Errorf(`marshal error - %v`, err)
@@ -336,6 +336,10 @@ func (a *Agent) SendProofRequest(pr domain.PresentationRequest, to string) (resp
 	return a.post(a.adminUrl+endpointSendProofReq, data, fmt.Sprintf(`proof request received by %s`, to))
 }
 
+// PresentProof sends the presentation format of the proof to a verifier given by the peer agent label. It first fetches
+// existing credentials from the holder's wallet and gets the corresponding record stored by the webhook. This is then
+// used to extract requested attributes by the verifier along with the existing credentials from the holder's proof in order
+// to construct the presentation proof.
 func (a *Agent) PresentProof(to string) (response []byte, err error) {
 	// todo only requested attributes atm
 	creds, err := a.getCredentialsFromWallet()
@@ -352,6 +356,7 @@ func (a *Agent) PresentProof(to string) (response []byte, err error) {
 	return a.sendProofPresentation(pp.PresExID, proof)
 }
 
+// constructProof checks the values from the existing credentials in the wallet to match with requested attributes
 func (a *Agent) constructProof(reqAttributes map[string]domain.Attribute, creds []responses.WalletCredential) requests.ProofPresentation {
 	var proof requests.ProofPresentation
 	proof.Indy.RequestedAttributes = make(map[string]requests.AdditionalProp)
@@ -361,7 +366,7 @@ attrLoop:
 	for reqAttrKey, reqAttr := range reqAttributes {
 		for _, cred := range creds {
 			for credAttrName, _ := range cred.Attrs {
-				// check if stored attribute name and cred def ID are same as the requested
+				// checks if stored attribute name and cred def ID are same as the requested
 				if reqAttr.Name == credAttrName {
 					for _, restrict := range reqAttr.Restrictions {
 						if restrict.CredDefID == cred.CredDefID {
